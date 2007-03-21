@@ -1,0 +1,4 @@
+; $Id$
+name = pot-file extractor
+description = Helps to extract pot-files for translations from the sources of installed modules.
+dependencies = locale

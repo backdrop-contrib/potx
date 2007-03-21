@@ -1,0 +1,244 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * TODO: Enter file description here.
+ */
+
+
+/**
+ * Implementation of hook_perm().
+ */
+function potx_perm() {
+  return array('extract pot file');
+}
+
+
+/**
+ * Implementation of hook_help().
+ */
+function potx_help($section) {
+  switch ($section) {
+    case 'admin/help#potx':
+      return t('Helps to extract pot-files for translations from the sources of installed modules.');
+    case 'admin/modules#description':
+      return t('Helps to extract pot-files for translations from the sources of installed modules.');
+    // OPTIONAL: Add additional cases for other paths that should display help text.
+  }
+}
+
+
+/**
+ * Implementation of hook_menu().
+ */
+function potx_menu($may_cache) {
+  $items = array();
+
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'admin/settings/locale/potx',
+      'title' => t('potx'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('potx_select_module_form'),
+      'access' => user_access('extract pot file'),
+      'weight' => 20,
+      'type' => MENU_LOCAL_TASK,
+    );
+  }
+  // OPTIONAL: Put in else statement for dynamic menu items that can't be cached.
+
+  return $items;
+}
+
+/**
+ * admin interface to start pot-file extraction from
+ */
+function potx_select_module_form() {
+
+  $modules = _potx_get_module_list();
+  $mod_s = _potx_structure_module_array($modules);
+  $mform = array(
+    'potx-form-title' => array(
+      '#value' => t('<h3>Extract pot-file from module source</h3>'),
+    ),
+  );
+  potx_build_module_form($mform, $mod_s);
+
+  $mform['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Extract'),
+  );
+
+  $mform['#submit']['potx_deliver_pot_file'] = array();
+
+  return $mform;
+}
+
+/**
+ * callback to handle the form submission
+ */
+function potx_deliver_pot_file($form_id, &$form) {
+  // value to handle is in $form['potx-x-sel']
+  print 'Soon to come: the pot-file';
+  exit;
+}
+
+/**
+ * get list of modules.
+ * code stolen from module_rebuild_cache() in $DRUPAL/includes/module.inc
+ */
+function _potx_get_module_list() {
+  // Get current list of modules
+  $files = drupal_system_listing('\.module$', 'modules', 'name', 0);
+
+  // Extract current files from database.
+  system_get_files_database($files, 'module');
+
+  ksort($files);
+
+  foreach ($files as $filename => $file) {
+    $file->info = _module_parse_info_file(dirname($file->filename) .'/'. $file->name .'.info');
+    // Skip modules that don't provide info (or are not installed)
+    if (empty($file->info) || !$file->status) {
+      unset($files[$filename]);
+      continue;
+    }
+    $files[$filename]->info = $file->info;
+  }
+
+  return $files;
+}
+
+/**
+ * build the form
+ */
+function potx_build_module_form(&$mform, &$dir, $dirname = '') {
+
+  if (isset($dir['.modules'])) {
+    $mods_in_dir = $dir['.modules'];
+    unset($dir['.modules']);
+  }
+
+  $dirkeys = array_keys($dir);
+  if ($mods_in_dir && (count($dir) == 1)) { // it's a directory with 1 module
+    $entry = $dirkeys[0];
+    potx_add_form_element_dir_1m($mform, $dir[$entry]);
+    return;
+  }
+
+  if (preg_match('/\/modules\b(\/.+)?/', $dirname, $pathmatch)) {
+    $subst = array('!dirname' => substr($dirname,1));
+    if ($pathmatch[1]) {
+      $mform[_potx_make_id_string('dir', $dirname)] = array(
+        '#type' => 'radio',
+        '#title' => t('extract pot-file for all modules in directory <em>!dirname</em>', $subst),
+        '#description' => t('To extract a pot-file from a single module in this directory choose the module-entry in the fieldset below.'),
+        '#default_value' => 0,
+        '#return_value' => dirname($module->filename),
+        // put all radios in the same group
+        '#parents' => array('potx-x-sel'),
+      );
+    }
+    $element = array(
+      '#type' => 'fieldset',
+      '#title' => t("Modules in '!dirname'", $subst),
+      //'#description' => t('Modules in directory !dirname and below', $subst),
+      '#collapsible' => true,
+      '#collapsed' => true,
+    );
+    $mform[_potx_make_id_string('fs', $dirname)] =& $element;
+  }
+  else {
+    $element =& $mform;
+  }
+
+  ksort($dir);
+  foreach (array_keys($dir) as $entry) {
+    $m =& $dir[$entry];
+    if ($entry[0] == '#') {
+      potx_add_form_element_module($element, $dir[$entry]);
+    }
+    else {
+      potx_build_module_form($element, $dir[$entry], "$dirname/$entry");
+    }
+  }
+
+  return count($dir);
+}
+
+/**
+ * returns form-element (radio button) for 1 module in a dir with more
+ */
+function potx_add_form_element_module(&$mform, &$module) {
+  $fs_id = _potx_make_id_string('fs-', $module->basename);
+  $mod_id = _potx_make_id_string('mod-', $module->basename);
+  $subst = array(
+    '!moddir' => dirname($module->filename),
+    '!modname' => basename($module->basename, '.module'),
+  );
+  $mform[$mod_id] = array(
+    '#type' => 'radio',
+    '#title' => t('extract pot-file for module <em>!modname</em>', $subst),
+    '#description' => t('extracting from files <em>!modname.*</em> in directory <em>!moddir</em>', $subst),
+    '#default_value' => 0,
+    '#return_value' => $module->filename,
+    // put all radios in the same group
+    '#parents' => array('potx-x-sel'),
+  );
+  return 1;
+}
+
+/**
+ * returns form-element (radio button) for single module directory
+ */
+function potx_add_form_element_dir_1m(&$mform, &$module) {
+  $moddir = dirname($module->filename);
+  $id = _potx_make_id_string('dir', $moddir);
+  $mform[$id] = array(
+    '#type' => 'radio',
+    '#title' => t('extract pot-file for module %modname (in directory %dirname)',
+                  array('%dirname' => $moddir,
+                        '%modname' => basename($module->basename, '.module'),
+                  )),
+    '#default_value' => 0,
+    '#return_value' => $moddir,
+    // put all radios in the same group
+    '#parents' => array('potx-x-sel'),
+  );
+  return 1;
+}
+
+/**
+ * we need to make sure we get a sane id-string
+ */
+function _potx_make_id_string($type, $path) {
+  return "potx-$type" . preg_replace('/[^a-zA-Z0-9]+/', '-', $path);
+}
+
+/**
+ * take the flat module array and return a structured variant
+ */
+function _potx_structure_module_array(&$mods_flat) {
+  $mods_s = array();
+  foreach (array_keys($mods_flat) as $modname) {
+    $module =& $mods_flat[$modname];
+
+    $path_parts = explode('/', dirname($module->filename));
+    // build directory tree structure
+    $dir =& $mods_s;
+    foreach ($path_parts as $dirname) {
+      if (!isset($dir[$dirname])) $dir[$dirname] = array();
+      $dir =& $dir[$dirname];
+    }
+
+    $dir['#'.$module->basename] =& $module;
+
+    // count modules in this dir
+    $dir['.modules']++;
+  }
+
+  return $mods_s;
+}
+
+?>
