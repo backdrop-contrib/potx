@@ -143,13 +143,19 @@ function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
 
 /**
  * Write out generated files to the current folder.
+ * 
+ * @param $httpout filename for content-disposition header, if not given
+ *                 files are written local to the filesystem
+ * @param $disp content-disposition (see rfc2183), 'inline' or 'attachment',
+ *        defaults to 'inline', only used if $httpout is set
  */
-function _potx_write_files() {
+function _potx_write_files($httpout = NULL, $disp = 'inline') {
   $output = _potx_store();
 
   // Merge too small files into general.pot.
+  // merge all files if generating output for http-response
   foreach ($output as $file => $content) {
-    if (count($content) <= 11 && $file != 'general') {
+    if (isset($httpout) || (count($content) <= 11 && $file != 'general')) {
       @$output['general'][1] = array_unique(array_merge($output['general'][1], $content[1]));
       if (!isset($output['general'][0])) {
         $output['general'][0] = $content[0];
@@ -177,6 +183,15 @@ function _potx_write_files() {
     else {
       $filelist = "No version information was available in the source files.";
     }
+
+    if ($httpout) {
+      header('Content-Type: text/plain; charset=utf-8');
+      header('Content-Transfer-Encoding: 8bit');
+      header("Content-Disposition: $disp; filename=$httpout");
+      print str_replace("--VERSIONS--", $filelist, join("", $content));
+      return;
+    }
+
     $fp = fopen($file, 'w');
     fwrite($fp, str_replace("--VERSIONS--", $filelist, join("", $content)));
     fclose($fp);
@@ -306,7 +321,7 @@ function _potx_marker_error($file, $line, $marker, &$tokens, $ti) {
  *   TRUE if the message is an error
  */
 function _potx_status($text, $error = FALSE) {
-  if (defined(POTX_STATUS_SILENT)) {
+  if (defined('POTX_STATUS_SILENT')) {
     return;
   }
   if ($error) {
@@ -726,12 +741,20 @@ function _potx_find_info_file_strings($file, &$strings) {
  * @param $path
  *   Where to start searching for files recursively.
  */
-function _potx_explore_dir($path = '') {
-  $files = glob("$path*.{php,inc,module,engine,theme,install,info,profile}", GLOB_BRACE);
+function _potx_explore_dir($path = '', $basename = '*') {
+  // make sure non-empty path has trailing slash
+  if ($path && ($path[strlen($path)-1] != '/')) {
+    $path .= '/';
+  }
+  $files = glob("$path$basename.{php,inc,module,engine,theme,install,info,profile}", GLOB_BRACE);
+//  if ($basename != '*') {
+//    return $files;
+//  }
   $dirs = glob("$path*", GLOB_ONLYDIR);
   foreach ($dirs as $dir) {
-    if (!preg_match("!(^|.+/)(CVS|.svn)$!", $dir)) {
-      $files = array_merge($files, _potx_explore_dir("$dir/"));
+    // TODO: add extensions for other VCS dirs
+    if (!preg_match("!(^|.+/)(CVS|.svn|.git)$!", $dir)) {
+      $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
     }
   }
   // Skip the CLI interface, because it contains test strings

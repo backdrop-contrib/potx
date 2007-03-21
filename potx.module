@@ -79,8 +79,36 @@ function potx_select_module_form() {
  * callback to handle the form submission
  */
 function potx_deliver_pot_file($form_id, &$form) {
+
+  // this could take some time ...
+  @set_time_limit(0);
+
+  define('POTX_STATUS_SILENT', 1);
+  require_once('potx.inc'); // work done in there
+
   // value to handle is in $form['potx-x-sel']
-  print 'Soon to come: the pot-file';
+  $val = $form['potx-x-sel'];
+  // realpath($val)
+  $pinfo = pathinfo($val);
+  if ($pinfo['extension'] == 'module') {
+    $bname = basename($pinfo['basename'], '.module');
+    $files = _potx_explore_dir($pinfo['dirname'], $bname);
+    $httpout = "$bname.pot";
+  }
+  else {
+    $files = _potx_explore_dir($val);
+    $httpout = $pinfo['basename'] . '.pot';
+  }
+
+  $strings = $file_versions = $installer_strings = array();
+  foreach ($files as $file) {
+    _potx_process_file($file, $strings, $file_versions, $installer_strings);
+  }
+  _potx_build_files($strings, $file_versions);
+  _potx_build_files($installer_strings, $file_versions, 'installer');
+
+  _potx_write_files($httpout);
+
   exit;
 }
 
