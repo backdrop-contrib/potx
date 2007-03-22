@@ -65,6 +65,24 @@ function potx_select_module_form() {
   );
   potx_build_module_form($mform, $mod_s);
 
+  // experimental: make po-file for module instead of pot-file
+  $slangs = locale_supported_languages();
+  $lang_names = $slangs['name'];
+  if (count($lang_names) > 1) {
+    $lang_opts = array('pot' => t('generate POT-file'));
+    foreach ($lang_names as $lcode => $lname) {
+      if ($lcode == 'en') continue;
+      $lang_opts[$lcode] = t('po-file for !langname', array('!langname' => $lname));
+    }
+    $mform['potx-po-lang'] = array(
+      '#type' => 'select',
+      '#title' => t('Select result'),
+      '#default_value' => 'pot',
+      '#options' => $lang_opts,
+      '#description' => t('Choose to create a pot-file or a po-file filled with drupal-translations'),
+    );
+  }
+
   $mform['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Extract'),
@@ -93,19 +111,29 @@ function potx_deliver_pot_file($form_id, &$form) {
   if ($pinfo['extension'] == 'module') {
     $bname = basename($pinfo['basename'], '.module');
     $files = _potx_explore_dir($pinfo['dirname'], $bname);
-    $httpout = "$bname.pot";
+    $httpout = $bname;
   }
   else {
     $files = _potx_explore_dir($val);
-    $httpout = $pinfo['basename'] . '.pot';
+    $httpout = $pinfo['basename'];
+  }
+
+  // generate pot- or po-file?
+  $po_lang = NULL;
+  if (isset($form['potx-po-lang']) && ($form['potx-po-lang'] != 'pot')) {
+    $po_lang = $form['potx-po-lang'];
+    $httpout .= "-$po_lang.po";
+  }
+  else {
+    $httpout .= '.pot';
   }
 
   $strings = $file_versions = $installer_strings = array();
   foreach ($files as $file) {
     _potx_process_file($file, $strings, $file_versions, $installer_strings);
   }
-  _potx_build_files($strings, $file_versions);
-  _potx_build_files($installer_strings, $file_versions, 'installer');
+  _potx_build_files($strings, $file_versions, NULL, $po_lang);
+  _potx_build_files($installer_strings, $file_versions, 'installer', $po_lang);
 
   _potx_write_files($httpout);
 

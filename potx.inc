@@ -62,7 +62,7 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
 
   // Watchdog type names
   _potx_find_watchdog_calls($tokens, $file, $strings);
-  
+
   // Plurals need unique formatting
   _potx_find_format_plural_calls($tokens, $file, $strings);
 
@@ -70,7 +70,7 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
   _potx_find_perm_hook($code, $file, $strings);
   _potx_find_node_types_hook($code, $file, $strings);
   _potx_find_module_name($code, $file, $strings);
-  
+
   // Locale.inc contains a language list we need
   _potx_find_language_names($code, $file, $strings);
 
@@ -88,9 +88,19 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
  *   Original source file versions to output into the templates
  * @param $forcename
  *   Forces a given file name to get used (specify without extension)
- */   
-function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
-  
+ * @param $po_locale
+ *   language code to use for inserting translation to make a po-file
+ */
+function _potx_build_files(&$strings, &$file_versions, $forcename = NULL, $po_locale = NULL) {
+  global $locale;
+  $dotrans = false;
+  if (isset($po_locale)) {
+    $old_locale = $locale;
+    $locale = $po_locale;
+    $dotrans = true;
+  }
+
+  $str_tr = '';
   foreach ($strings as $str => $fileinfo) {
     // Build a compact list of files this strings occured in.
     $occured = $filelist = array();
@@ -124,17 +134,24 @@ function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
 
     if (strpos($str, "\0") === FALSE) {
       $output .= "msgid \"$str\"\n";
-      $output .= "msgstr \"\"\n";
+      if ($dotrans) $str_tr = _potx_try_translate($str);
+      $output .= "msgstr \"$str_tr\"\n";
     }
     else {
       // Plural strings have a null byte delimited format.
       list ($singular, $plural) = explode("\0", $str);
       $output .= "msgid \"$singular\"\n";
       $output .= "msgid_plural \"$plural\"\n";
-      $output .= "msgstr[0] \"\"\n";
-      $output .= "msgstr[1] \"\"\n";
+      if ($dotrans) $str_tr = _potx_try_translate($singular);
+      $output .= "msgstr[0] \"$str_tr\"\n";
+      if ($dotrans) $str_tr = _potx_try_translate($plural);
+      $output .= "msgstr[1] \"$str_tr\"\n";
     }
     $output .= "\n";
+
+    if ($dotrans) { // reset locale to what it was before
+      $locale = $old_locale;
+    }
 
     // Store the generated output in the given file.
     _potx_store($filename, $output, $filelist);
@@ -142,8 +159,17 @@ function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
 }
 
 /**
+ * Try to find the translation currently used by drupal
+ */
+function _potx_try_translate(&$str) {
+  if (!function_exists('locale')) return '';
+  $str_tr = locale($str);
+  return (($str_tr == $str) ? '' : $str_tr);
+}
+
+/**
  * Write out generated files to the current folder.
- * 
+ *
  * @param $httpout filename for content-disposition header, if not given
  *                 files are written local to the filesystem
  * @param $disp content-disposition (see rfc2183), 'inline' or 'attachment',
@@ -334,11 +360,11 @@ function _potx_status($text, $error = FALSE) {
 
 /**
  * Detect all occurances of t()-like calls.
- * 
+ *
  * These sequences are searched for:
  *   T_STRING("$functionname") + "(" + T_CONSTANT_ENCAPSED_STRING + ")"
  *   T_STRING("$functionname") + "(" + T_CONSTANT_ENCAPSED_STRING + ","
- *   
+ *
  * @param $tokens
  *   The current tokens array
  * @param $file
@@ -385,11 +411,11 @@ function _potx_find_t_calls(&$tokens, $file, &$strings, $functionname = 't', $ma
 
 /**
  * Detect all occurances of $t() calles.
- * 
+ *
  * These sequences are searched for:
  *   T_VARIABLE("$t") + "(" + T_CONSTANT_ENCAPSED_STRING + ")"
  *   T_VARIABLE("$t") + "(" + T_CONSTANT_ENCAPSED_STRING + ","
- *   
+ *
  * @param $tokens
  *   The current tokens array
  * @param $file
@@ -434,7 +460,7 @@ function _potx_find_dollart_calls(&$tokens, $file, &$strings, $markdup = FALSE) 
 
 /**
  * Detect all occurances this format_plural calls.
- * 
+ *
  * These sequences are searched for:
  *   T_STRING("format_plural") + "(" + ..anything (might be more tokens).. +
  *   "," + T_CONSTANT_ENCAPSED_STRING +
@@ -621,7 +647,7 @@ function _potx_find_module_name($code, $file, &$strings) {
 
 /**
  * Get languages names from locale.inc, if we encounter that file.
- * 
+ *
  * @param $code
  *   Complete source code of the file parsed
  * @param $file
@@ -661,7 +687,7 @@ function _potx_find_version_number($code, $file, &$file_versions) {
 /**
  * Add date strings if locale.module is parsed. This cannot be
  * extracted otherwise.
- * 
+ *
  * @param $file
  *   Name of the file parsed
  * @param $strings
@@ -686,7 +712,7 @@ function _potx_add_date_strings($file, &$strings) {
 /**
  * Add format_interval special strings if common.inc is parsed.
  * This cannot be extracted otherwise.
- * 
+ *
  * @param $file
  *   Name of the file parsed
  * @param $strings
@@ -710,7 +736,7 @@ function _potx_add_format_interval_strings($file, &$strings) {
 
 /**
  * Parse an .info file and add relevant strings to the list.
- * 
+ *
  * @param $file
  *   Name of the file parsed
  * @param $strings
