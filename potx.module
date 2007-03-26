@@ -2,18 +2,8 @@
 // $Id$
 
 /**
- * @file
- * TODO: Enter file description here.
+ * @file Gettext translation template extractor.
  */
-
-
-/**
- * Implementation of hook_perm().
- */
-function potx_perm() {
-  return array('extract pot file');
-}
-
 
 /**
  * Implementation of hook_help().
@@ -21,13 +11,10 @@ function potx_perm() {
 function potx_help($section) {
   switch ($section) {
     case 'admin/help#potx':
-      return t('Helps to extract pot-files for translations from the sources of installed modules.');
     case 'admin/modules#description':
       return t('Helps to extract pot-files for translations from the sources of installed modules.');
-    // OPTIONAL: Add additional cases for other paths that should display help text.
   }
 }
-
 
 /**
  * Implementation of hook_menu().
@@ -41,13 +28,11 @@ function potx_menu($may_cache) {
       'title' => t('potx'),
       'callback' => 'drupal_get_form',
       'callback arguments' => array('potx_select_module_form'),
-      'access' => user_access('extract pot file'),
+      'access' => user_access('administer locales'),
       'weight' => 20,
       'type' => MENU_LOCAL_TASK,
     );
   }
-  // OPTIONAL: Put in else statement for dynamic menu items that can't be cached.
-
   return $items;
 }
 
@@ -98,11 +83,12 @@ function potx_select_module_form() {
  */
 function potx_deliver_pot_file($form_id, &$form) {
 
-  // this could take some time ...
+  // This could take some time.
   @set_time_limit(0);
+  require_once('potx.inc');
 
-  define('POTX_STATUS_SILENT', 1);
-  require_once('potx.inc'); // work done in there
+  // Silence status messages.
+  _potx_status(POTX_STATUS_SILENT);
 
   // value to handle is in $form['potx-x-sel']
   $val = $form['potx-x-sel'];
@@ -141,10 +127,11 @@ function potx_deliver_pot_file($form_id, &$form) {
 }
 
 /**
- * get list of modules.
+ * Get list of modules.
  * code stolen from module_rebuild_cache() in $DRUPAL/includes/module.inc
  */
 function _potx_get_module_list() {
+  
   // Get current list of modules
   $files = drupal_system_listing('\.module$', 'modules', 'name', 0);
 
@@ -296,5 +283,3 @@ function _potx_structure_module_array(&$mods_flat) {
 
   return $mods_s;
 }
-
-?>

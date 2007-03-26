@@ -6,6 +6,18 @@
  */
 
 /**
+ * Command line status reporting:
+ *  - status to standard output
+ *  - errors to standard error
+ */
+define('POTX_STATUS_CLI',    0);
+
+/**
+ * Silence status reports.
+ */
+define('POTX_STATUS_SILENT', 1);
+
+/**
  * Process a file and put extracted information to the given parameters.
  *
  * @param $file
@@ -88,19 +100,9 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
  *   Original source file versions to output into the templates
  * @param $forcename
  *   Forces a given file name to get used (specify without extension)
- * @param $po_locale
- *   language code to use for inserting translation to make a po-file
  */
-function _potx_build_files(&$strings, &$file_versions, $forcename = NULL, $po_locale = NULL) {
-  global $locale;
-  $dotrans = false;
-  if (isset($po_locale)) {
-    $old_locale = $locale;
-    $locale = $po_locale;
-    $dotrans = true;
-  }
+function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
 
-  $str_tr = '';
   foreach ($strings as $str => $fileinfo) {
     // Build a compact list of files this strings occured in.
     $occured = $filelist = array();
@@ -134,24 +136,17 @@ function _potx_build_files(&$strings, &$file_versions, $forcename = NULL, $po_lo
 
     if (strpos($str, "\0") === FALSE) {
       $output .= "msgid \"$str\"\n";
-      if ($dotrans) $str_tr = _potx_try_translate($str);
-      $output .= "msgstr \"$str_tr\"\n";
+      $output .= "msgstr \"\"\n";
     }
     else {
       // Plural strings have a null byte delimited format.
       list ($singular, $plural) = explode("\0", $str);
       $output .= "msgid \"$singular\"\n";
       $output .= "msgid_plural \"$plural\"\n";
-      if ($dotrans) $str_tr = _potx_try_translate($singular);
-      $output .= "msgstr[0] \"$str_tr\"\n";
-      if ($dotrans) $str_tr = _potx_try_translate($plural);
-      $output .= "msgstr[1] \"$str_tr\"\n";
+      $output .= "msgstr[0] \"\"\n";
+      $output .= "msgstr[1] \"\"\n";
     }
     $output .= "\n";
-
-    if ($dotrans) { // reset locale to what it was before
-      $locale = $old_locale;
-    }
 
     // Store the generated output in the given file.
     _potx_store($filename, $output, $filelist);
@@ -159,29 +154,24 @@ function _potx_build_files(&$strings, &$file_versions, $forcename = NULL, $po_lo
 }
 
 /**
- * Try to find the translation currently used by drupal
- */
-function _potx_try_translate(&$str) {
-  if (!function_exists('locale')) return '';
-  $str_tr = locale($str);
-  return (($str_tr == $str) ? '' : $str_tr);
-}
-
-/**
  * Write out generated files to the current folder.
  *
- * @param $httpout filename for content-disposition header, if not given
- *                 files are written local to the filesystem
- * @param $disp content-disposition (see rfc2183), 'inline' or 'attachment',
- *        defaults to 'inline', only used if $httpout is set
+ * @param $http_filename
+ *   File name for content-disposition header in case of usage
+ *   over HTTP. If not given, files are written local to the filesystem.
+ * @param $content_disposition
+ *   See RFC2183. 'inline' or 'attachment', with a default of
+ *   'inline'. Only used if $http_filename is set.
+ * @todo
+ *   Look into whether multiple files can be output via HTTP
  */
-function _potx_write_files($httpout = NULL, $disp = 'inline') {
+function _potx_write_files($http_filename = NULL, $content_disposition = 'inline') {
   $output = _potx_store();
 
   // Merge too small files into general.pot.
-  // merge all files if generating output for http-response
+  // Merge all files if generating output for HTTP response.
   foreach ($output as $file => $content) {
-    if (isset($httpout) || (count($content) <= 11 && $file != 'general')) {
+    if (isset($http_filename) || (count($content) <= 11 && $file != 'general')) {
       @$output['general'][1] = array_unique(array_merge($output['general'][1], $content[1]));
       if (!isset($output['general'][0])) {
         $output['general'][0] = $content[0];
@@ -209,17 +199,18 @@ function _potx_write_files($httpout = NULL, $disp = 'inline') {
     else {
       $filelist = "No version information was available in the source files.";
     }
+    $content = str_replace("--VERSIONS--", $filelist, join("", $content));
 
-    if ($httpout) {
+    if ($http_filename) {
       header('Content-Type: text/plain; charset=utf-8');
       header('Content-Transfer-Encoding: 8bit');
-      header("Content-Disposition: $disp; filename=$httpout");
-      print str_replace("--VERSIONS--", $filelist, join("", $content));
+      header("Content-Disposition: $content_disposition; filename=$http_filename");
+      print $content;
       return;
     }
 
     $fp = fopen($file, 'w');
-    fwrite($fp, str_replace("--VERSIONS--", $filelist, join("", $content)));
+    fwrite($fp, $content);
     fclose($fp);
   }
 }
@@ -342,19 +333,26 @@ function _potx_marker_error($file, $line, $marker, &$tokens, $ti) {
  * Status notification function
  *
  * @param $text
- *   Text of status message
+ *   Text of status message, or POTX_STATUS_* constant
+ *   to set status reporting mode.
  * @param $error
  *   TRUE if the message is an error
  */
 function _potx_status($text, $error = FALSE) {
-  if (defined('POTX_STATUS_SILENT')) {
-    return;
+  static $reporting = POTX_STATUS_CLI;
+  
+  // Modify status, if given.
+  if (!is_string($text)) {
+    $reporting = $text;
   }
-  if ($error) {
-    fwrite(STDERR, $text);
-  }
-  else {
-    print $text;
+  
+  if ($reporting == POTX_STATUS_CLI) {
+    if ($error) {
+      fwrite(STDERR, $text);
+    }
+    else {
+      print $text;
+    }
   }
 }
 
@@ -766,25 +764,20 @@ function _potx_find_info_file_strings($file, &$strings) {
  *
  * @param $path
  *   Where to start searching for files recursively.
+ *   Provide non-empty path values with a trailing slash.
+ * @todo
+ *   Add folder exceptions for other version control systems.
  */
-function _potx_explore_dir($path = '', $basename = '*') {
-  // make sure non-empty path has trailing slash
-  if ($path && ($path[strlen($path)-1] != '/')) {
-    $path .= '/';
-  }
+function _potx_explore_dir($path = '') {
   $files = glob("$path$basename.{php,inc,module,engine,theme,install,info,profile}", GLOB_BRACE);
-//  if ($basename != '*') {
-//    return $files;
-//  }
   $dirs = glob("$path*", GLOB_ONLYDIR);
   foreach ($dirs as $dir) {
-    // TODO: add extensions for other VCS dirs
     if (!preg_match("!(^|.+/)(CVS|.svn|.git)$!", $dir)) {
-      $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
+      $files = array_merge($files, _potx_explore_dir("$dir/"));
     }
   }
-  // Skip the CLI interface, because it contains test strings
-  // we don't need on a normal run
+  // Skip the CLI interface, because it contains test strings,
+  // we don't need on a normal run.
   if (($id = array_search('potx-cli.php', $files)) !== FALSE) {
     unset($files[$id]);
   }
