@@ -765,18 +765,21 @@ function _potx_find_info_file_strings($file, &$strings) {
  * @param $path
  *   Where to start searching for files recursively.
  *   Provide non-empty path values with a trailing slash.
+ * @param $basename
+ *   Allows the restriction of search to a specific basename
+ *   (ie. to collect files for a specific module).
  * @todo
  *   Add folder exceptions for other version control systems.
  */
-function _potx_explore_dir($path = '') {
+function _potx_explore_dir($path = '', $basename) {
   $files = glob("$path$basename.{php,inc,module,engine,theme,install,info,profile}", GLOB_BRACE);
   $dirs = glob("$path*", GLOB_ONLYDIR);
   foreach ($dirs as $dir) {
     if (!preg_match("!(^|.+/)(CVS|.svn|.git)$!", $dir)) {
-      $files = array_merge($files, _potx_explore_dir("$dir/"));
+      $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
     }
   }
-  // Skip the CLI interface, because it contains test strings,
+  // Skip the file of the CLI interface, because it contains test strings,
   // we don't need on a normal run.
   if (($id = array_search('potx-cli.php', $files)) !== FALSE) {
     unset($files[$id]);
