@@ -1,4 +1,4 @@
 ; $Id$
-name = Gettext translation template extractor
+name = POT extractor
 description = Provides a web interface to extract Gettext templates from the sources of installed modules.
 dependencies = locale

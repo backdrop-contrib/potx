@@ -771,7 +771,7 @@ function _potx_find_info_file_strings($file, &$strings) {
  * @todo
  *   Add folder exceptions for other version control systems.
  */
-function _potx_explore_dir($path = '', $basename) {
+function _potx_explore_dir($path = '', $basename = '*') {
   $files = glob("$path$basename.{php,inc,module,engine,theme,install,info,profile}", GLOB_BRACE);
   $dirs = glob("$path*", GLOB_ONLYDIR);
   foreach ($dirs as $dir) {
