@@ -27,6 +27,27 @@ Note: If you only get a white browser screen as response to the
 extraction request, the memory limit for PHP on the server is probably 
 too low, try to set that higher.
 
+USING potx-cli.php ON THE COMMAND LINE
+================================================================================
+
+Translation templates can easily be created by running the potx-cli.php
+script on all source files that contain translatable strings.
+
+  1. Copy the potx-cli.php and potx.inc to whatever folder you
+     would like to generate template files in.
+  2. Run 'php potx-cli.php' and the script will autodiscover
+     all possible files to generate templates for.
+  3. Translation templates are generated in this folder, if you
+     have the proper rights to create files here.
+     
+You can try 'php potx-cli.php --help' to get a list of more options.
+  
+All files get their own template file unless they contain less than
+ten strings, which will be merged in the general.pot file. This special
+template file also contains all strings that occur more than once in the
+Drupal source files. This will help translators to maintain a single
+translation for them. 
+
 CREDITS
 ================================================================================
 
