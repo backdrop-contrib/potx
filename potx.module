@@ -109,7 +109,7 @@ function potx_select_form_submit($form_id, &$form) {
   }
   // A directory name was requested.
   else {
-    $files = _potx_explore_dir($form['module']);
+    $files = _potx_explore_dir($form['module'] . '/');
     $outputname = $pathinfo['basename'] . '.pot';
   }
   
