@@ -1,0 +1,79 @@
+# $Id$
+# -----------------------------------------------------------------------------
+# Japanese translation of Drupal (.module)
+#
+# Copyright (c) 2006-2007  Drupal Japan  ( http://drupal.jp/ )  /
+#                          Drupal Nippon ( http://drupon.org/ ) /
+#                          Takafumi      ( jp.drupal@imagine **reverse order**)
+#
+# Generated from file:
+#  potx.module,v 1.1.2.5 2007/03/27 19:40:09 goba
+#  potx.info,v 1.1.2.3 2007/03/27 19:40:09 goba
+#
+# -----------------------------------------------------------------------------
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2007-04-19 20:07+0900\n"
+"Last-Translator: Takafumi <jp.drupal@imagine **reverse order**>\n"
+"Language-Team: Drupal Japan / Drupal Nippon\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+#: potx.module:15
+msgid "Helps to extract pot-files for translations from the sources of installed modules."
+msgstr "インストールされたモジュールのソースから、翻訳用の POT ファイルを抽出するのを支援します。"
+
+#: potx.module:17
+msgid "This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object Template file is generated (unlike the output of the command line extractor utility), so you can easily save it and start translation."
+msgstr "このページでモジュールファイルの翻訳用テンプレートの生成ができます。 テンプレートファイルを生成したいモジュールを選択してください。 コマンドラインの抽出ユーティリティとは違い、単一の PO ファイルが生成されるため、簡単に保存して翻訳を開始できます。"
+
+#: potx.module:30
+msgid "Extract strings"
+msgstr "文字列の抽出"
+
+#: potx.module:77
+msgid "Extract"
+msgstr "抽出"
+
+#: potx.module:165
+msgid "Extract from %module_name module, in directory %dir_name"
+msgstr "%dir_name 内の %module_name モジュールから抽出"
+
+#: potx.module:166
+msgid "Generates output from all files found in this directory."
+msgstr "このディレクトリで見つかった全ファイルから出力を生成します。"
+
+#: potx.module:181
+msgid "Extract from all modules in directory %dir_name"
+msgstr "%dir_name 内の全モジュールから抽出"
+
+#: potx.module:182
+msgid "To extract from a single module in this directory, choose the module entry in the fieldset below."
+msgstr "このディレクトリの単一モジュールから抽出するには、以下からモジュールを選んでください。"
+
+#: potx.module:191
+msgid "Modules in %dir_name"
+msgstr "%dir_name 内のモジュール"
+
+#: potx.module:211
+msgid "Extract from module %module_name"
+msgstr "%module_name モジュールから抽出"
+
+#: potx.module:212
+msgid "Extract from files named %module_pattern, in directory %module_dir."
+msgstr "%module_dir 内の %module_pattern ファイルから抽出します。"
+
+#: potx.module:0 potx.info:0
+msgid "potx"
+msgstr "potx"
+
+#: potx.info:0
+msgid "POT extractor"
+msgstr "POTエキストラクター"
+
+#: potx.info:0
+msgid "Provides a web interface to extract Gettext templates from the sources of installed modules."
+msgstr "インストールされたモジュールのソースからGettextテンプレートを抽出するウェブインターフェイスを提供します。"
+
