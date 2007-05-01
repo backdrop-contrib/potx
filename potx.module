@@ -174,11 +174,11 @@ function _potx_build_module_form(&$form, &$modules, $dirname = '') {
 
   // A directory with multiple modules in it.
   if (preg_match('!/modules\\b(/.+)?!', $dirname, $pathmatch)) {
-    $subst = array('%dir_name' => substr($dirname, 1));
+    $subst = array('@dir_name' => substr($dirname, 1));
     if ($pathmatch[1]) {
       $form[_potx_form_id('dir', $dirname)] = array(
         '#type' => 'radio',
-        '#title' => t('Extract from all modules in directory %dir_name', $subst),
+        '#title' => t('Extract from all modules in directory "@dir_name"', $subst),
         '#description' => t('To extract from a single module in this directory, choose the module entry in the fieldset below.'),
         '#default_value' => 0,
         '#return_value' => substr($dirname, 1),
@@ -188,7 +188,7 @@ function _potx_build_module_form(&$form, &$modules, $dirname = '') {
     }
     $element = array(
       '#type' => 'fieldset',
-      '#title' => t('Modules in %dir_name', $subst),
+      '#title' => t('Modules in "@dir_name"', $subst),
       '#collapsible' => true,
       '#collapsed' => true,
     );
