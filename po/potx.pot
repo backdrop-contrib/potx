@@ -1,0 +1,67 @@
+# $Id$
+#
+# LANGUAGE translation of Drupal (potx.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from file: potx.module,v 1.1.2.7 2007/05/01 15:29:24 goba
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2007-05-01 23:52+0200\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: potx.module:15
+msgid "Helps to extract pot-files for translations from the sources of installed modules."
+msgstr ""
+
+#: potx.module:17
+msgid "This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object Template file is generated (unlike the output of the command line extractor utility), so you can easily save it and start translation."
+msgstr ""
+
+#: potx.module:30
+msgid "Extract strings"
+msgstr ""
+
+#: potx.module:77
+msgid "Extract"
+msgstr ""
+
+#: potx.module:165
+msgid "Extract from %module_name module, in directory %dir_name"
+msgstr ""
+
+#: potx.module:166
+msgid "Generates output from all files found in this directory."
+msgstr ""
+
+#: potx.module:181
+msgid "Extract from all modules in directory \"@dir_name\""
+msgstr ""
+
+#: potx.module:182
+msgid "To extract from a single module in this directory, choose the module entry in the fieldset below."
+msgstr ""
+
+#: potx.module:191
+msgid "Modules in \"@dir_name\""
+msgstr ""
+
+#: potx.module:211
+msgid "Extract from module %module_name"
+msgstr ""
+
+#: potx.module:212
+msgid "Extract from files named %module_pattern, in directory %module_dir."
+msgstr ""
+
+#: potx.module:0
+msgid "potx"
+msgstr ""
+
