@@ -130,8 +130,8 @@ function potx_select_form_submit($form_id, &$form) {
   foreach ($files as $file) {
     _potx_process_file($file, $strings, $file_versions, $installer_strings);
   }
-  _potx_build_files($strings, $file_versions);
-  _potx_write_files($outputname);
+  _potx_build_files($strings, $file_versions, POTX_MODE_SINGLE);
+  _potx_write_files($outputname, 'attachment');
 
   exit;
 }

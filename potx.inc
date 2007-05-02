@@ -2,7 +2,8 @@
 // $Id$
 
 /**
- * @file Common functions used by the web and command line interface.
+ * @file
+ *   Common functions used by the web and command line interface.
  */
 
 /**
@@ -18,6 +19,26 @@ define('POTX_STATUS_CLI',    0);
 define('POTX_STATUS_SILENT', 1);
 
 /**
+ * Core parsing mode:
+ *  - .info files folded into general.pot
+ *  - separate files generated for modules
+ */
+define('POTX_MODE_CORE', 0);
+
+/**
+ * Multiple files mode:
+ *  - .info files folded into their module pot files
+ *  - separate files generated for modules
+ */
+define('POTX_MODE_MULTIPLE', 1);
+
+/**
+ * Single file mode:
+ *  - all files folded into one pot file
+ */
+define('POTX_MODE_SINGLE', 2);
+
+/**
  * Process a file and put extracted information to the given parameters.
  *
  * @param $file
@@ -30,12 +51,17 @@ define('POTX_STATUS_SILENT', 1);
  *   Array to add any installer time strings identified
  */
 function _potx_process_file($file, &$strings, &$file_versions, &$installer_strings) {
-  $code = file_get_contents($file);
 
+  // Figure out the basename and extension to select extraction method.
+  $basename = basename($file);
+  list($filebase, $fileext) = explode(".", $basename, 2);
+
+  // Always grab the CVS version number from the code
+  $code = file_get_contents($file);
   _potx_find_version_number($code, $file, $file_versions);
 
-  // The .info files are not PHP code, they need special care.
-  if (strpos($file, '.info') !== FALSE) {
+  // The .info files are not PHP code, no need to tokenize.
+  if ($fileext == 'info') {
     _potx_find_info_file_strings($file, $strings);
     return;
   }
@@ -46,14 +72,25 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
   // Remove whitespace and possible HTML (the later in templates for example),
   // count line numbers so we can include them in the output.
   $tokens = array();
+  $tokenlookup = array();
+  $tokencounter = 0;
   $lineno = 1;
   foreach ($raw_tokens as $tok) {
     if ((!is_array($tok)) || (($tok[0] != T_WHITESPACE) && ($tok[0] != T_INLINE_HTML))) {
       if (is_array($tok)) {
         $tok[] = $lineno;
+         // Fill array for finding token offsets quickly.
+         if ($tok[0] == T_STRING || ($tok[0] == T_VARIABLE && $tok[1] == '$t')) {
+           if (!isset($tokenlookup[$tok[1]])) {
+             $tokenlookup[$tok[1]] = array();
+           }
+           $tokenlookup[$tok[1]][] = $tokencounter;
+         }
       }
       $tokens[] = $tok;
+      $tokencounter++;
     }
+    // Collect line numbers.
     if (is_array($tok)) {
       $lineno += count(split("\n", $tok[1])) - 1;
     } else {
@@ -62,33 +99,47 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
   }
   unset($raw_tokens);
 
-  // Regular t() calls with different usages
-  _potx_find_t_calls($tokens, $file, $strings);
-  _potx_find_t_calls($tokens, $file, $strings, '_locale_import_message');
-  _potx_find_dollart_calls($tokens, $file, $strings);
-
+  // Regular t() calls with different usages.
+  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings);
+  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings, '_locale_import_message');
+  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings, '$t');
+  
   // Installer related strings.
-  _potx_find_t_calls($tokens, $file, $installer_strings, 'st');
-  _potx_find_t_calls($tokens, $file, $installer_strings, '_locale_import_message', TRUE);
-  _potx_find_dollart_calls($tokens, $file, $installer_strings, TRUE);
+  _potx_find_t_calls($tokens, $tokenlookup, $file, $installer_strings, 'st');
+  _potx_find_t_calls($tokens, $tokenlookup, $file, $installer_strings, '_locale_import_message', TRUE);
+  _potx_find_t_calls($tokens, $tokenlookup, $file, $installer_strings, '$t', TRUE);
 
-  // Watchdog type names
-  _potx_find_watchdog_calls($tokens, $file, $strings);
+  // Watchdog calls have their first argument translated in Drupal 5.x.
+  // TODO: need to update this for Drupal 6.x
+  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings, 'watchdog');
 
-  // Plurals need unique formatting
-  _potx_find_format_plural_calls($tokens, $file, $strings);
+  // Plurals need unique parsing.
+  _potx_find_format_plural_calls($tokens, $tokenlookup, $file, $strings);
 
-  // Identify special parts by searching for Drupal hooks
-  _potx_find_perm_hook($code, $file, $strings);
-  _potx_find_node_types_hook($code, $file, $strings);
-  _potx_find_module_name($code, $file, $strings);
+  if ($fileext == 'module') {
+    _potx_find_perm_hook($tokens, $tokenlookup, $file, $filebase, $strings);
+    // TODO: this is required for Drupal 6.x.
+    // _potx_find_menu_hook($tokens, $tokenlookup, $file, $filebase, $strings);
+    _potx_find_node_types_hook($tokens, $tokenlookup, $file, $filebase, $strings);
+    // Add the module name.
+    $strings[$filebase][$file][] = 0;
+  }
+  
+  if ($fileext == 'theme') {
+    // Add the theme name.
+    $strings[$filebase][$file][] = 0;
+  }
 
-  // Locale.inc contains a language list we need
-  _potx_find_language_names($code, $file, $strings);
-
-  // Add some strings we cannot extract
-  _potx_add_date_strings($file, $strings);
-  _potx_add_format_interval_strings($file, $strings);
+  // Special handling of some Drupal core files.
+  if ($basename == 'locale.inc') {
+    //_potx_find_language_names($tokens, $tokenlookup, $file, $strings);
+  }
+  if ($basename == 'locale.module') {
+    _potx_add_date_strings($file, $strings);
+  }
+  if ($basename == 'common.inc') {
+    _potx_add_format_interval_strings($file, $strings);
+  }
 }
 
 /**
@@ -98,10 +149,12 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
  *   The strings gathered
  * @param $file_versions
  *   Original source file versions to output into the templates
+ * @param $mode
+ *   Storage mode used: single, multiple or core
  * @param $forcename
- *   Forces a given file name to get used (specify without extension)
+ *   Forces a given file name to get used, if single mode is on, without extension
  */
-function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
+function _potx_build_files(&$strings, &$file_versions, $mode = POTX_MODE_SINGLE, $forcename = 'general') {
 
   foreach ($strings as $str => $fileinfo) {
     // Build a compact list of files this strings occured in.
@@ -120,14 +173,14 @@ function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
     }
     $output = "#: $occurances\n";
 
-    // File name forcing if required.
-    if (isset($forcename)) {
+    // File name forcing in single mode.
+    if ($mode == POTX_MODE_SINGLE) {
       $filename = $forcename;
     }
     // Store .info file strings either in general.pot or the module pot file,
-    // depending on the infofolding mode used.
+    // depending on the mode used.
     elseif (strpos($occurances, '.info')) {
-      $filename = ($GLOBALS['infofolding'] ? 'general' : str_replace('.info', '.module', $filename));
+      $filename = ($mode == POTX_MODE_CORE ? 'general' : str_replace('.info', '.module', $filename));
     }
     // Else if occured more than once, store in general.pot.
     else {
@@ -158,7 +211,7 @@ function _potx_build_files(&$strings, &$file_versions, $forcename = NULL) {
  *
  * @param $http_filename
  *   File name for content-disposition header in case of usage
- *   over HTTP. If not given, files are written local to the filesystem.
+ *   over HTTP. If not given, files are written to the local filesystem.
  * @param $content_disposition
  *   See RFC2183. 'inline' or 'attachment', with a default of
  *   'inline'. Only used if $http_filename is set.
@@ -229,9 +282,9 @@ function _potx_store($file = NULL, $input = NULL, $filelist = array()) {
   static $storage = array();
   if (isset($file)) {
     if (isset($storage[$file])) {
-     // Maintain a list of unique file names.
-     $storage[$file][1] = array_unique(array_merge($storage[$file][1], $filelist));
-     $storage[$file][] = $input;
+      // Maintain a list of unique file names.
+      $storage[$file][1] = array_unique(array_merge($storage[$file][1], $filelist));
+      $storage[$file][] = $input;
     }
     else {
       $storage[$file] = array();
@@ -365,99 +418,41 @@ function _potx_status($text, $error = FALSE) {
  *
  * @param $tokens
  *   The current tokens array
+ * @param $tokenlookup
+ *   Helper array to quickly look up tokens
  * @param $file
  *   Name of file parsed
  * @param $strings
  *   Current strings array
  * @param functionname
- *   The name of the function to look for (could be t, st or any other t-like function)
+ *   The name of the function to look for (could be t, $t, st, watchdog or any other t-like function)
  * @param $markdup
- *   Mark strings as duplicate (ie possibly having translations elsewhere already).
+ *   Mark strings as duplicate (ie. possibly having translations elsewhere already).
  *   Used for installer strings, which get to a different file, so duplicate checking
  *   is not evident with standard gettext tools.
  */
-function _potx_find_t_calls(&$tokens, $file, &$strings, $functionname = 't', $markdup = FALSE) {
-
-  $ti = 0;
-  $tc = count($tokens);
-
-  while (($tc - $ti) > 3) {
-
-    list($ctok, $par, $mid, $rig) = array($tokens[$ti], $tokens[$ti+1], $tokens[$ti+2], $tokens[$ti+3]);
-    if (!is_array($ctok)) {
-      $ti++;
-      continue;
-    }
-    list($type, $string, $line) = $ctok;
-
-    if (($type == T_STRING) && ($string == $functionname) && ($par == "(")) {
-
-      if (in_array($rig, array(")", ","))
+function _potx_find_t_calls(&$tokens, $tokenlookup, $file, &$strings, $functionname = 't', $markdup = FALSE) {
+  // Lookup tokens by function name
+  if (is_array($tokenlookup[$functionname])) {
+    foreach ($tokenlookup[$functionname] as $ti) {
+      list($ctok, $par, $mid, $rig) = array($tokens[$ti], $tokens[$ti+1], $tokens[$ti+2], $tokens[$ti+3]);
+      list($type, $string, $line) = $ctok;
+      if ($par == "(") {
+        if (in_array($rig, array(")", ","))
           && (is_array($mid) && ($mid[0] == T_CONSTANT_ENCAPSED_STRING))) {
-
-        $strings[_potx_format_quoted_string($mid[1])][$file][] = $line . ($markdup ? '(dup)' : '');
-      }
-
-      // $functionname() found, but inside is something which is not a string literal
-      else {
-        _potx_marker_error($file, $line, $functionname, $tokens, $ti);
+            $strings[_potx_format_quoted_string($mid[1])][$file][] = $line . ($markdup ? '(dup)' : '');
+        }
+        else {
+          // $functionname() found, but inside is something which is not a string literal
+          _potx_marker_error($file, $line, $functionname, $tokens, $ti);
+        }
       }
     }
-    $ti++;
   }
 }
 
 /**
- * Detect all occurances of $t() calles.
- *
- * These sequences are searched for:
- *   T_VARIABLE("$t") + "(" + T_CONSTANT_ENCAPSED_STRING + ")"
- *   T_VARIABLE("$t") + "(" + T_CONSTANT_ENCAPSED_STRING + ","
- *
- * @param $tokens
- *   The current tokens array
- * @param $file
- *   Name of file parsed
- * @param $strings
- *   Current strings array
- * @param $markdup
- *   Mark strings as duplicate (ie possibly having translations elsewhere already).
- *   Used for installer strings, which get to a different file, so duplicate checking
- *   is not evident with standard gettext tools.
- */
-function _potx_find_dollart_calls(&$tokens, $file, &$strings, $markdup = FALSE) {
-
-  $ti = 0;
-  $tc = count($tokens);
-
-  while (($tc - $ti) > 3) {
-
-    list($ctok, $par, $mid, $rig) = array($tokens[$ti], $tokens[$ti+1], $tokens[$ti+2], $tokens[$ti+3]);
-    if (!is_array($ctok)) {
-      $ti++;
-      continue;
-    }
-    list($type, $string, $line) = $ctok;
-
-    if (($type == T_VARIABLE) && ($string == '$t') && ($par == "(")) {
-
-      if (in_array($rig, array(")", ","))
-          && (is_array($mid) && ($mid[0] == T_CONSTANT_ENCAPSED_STRING))) {
-
-        $strings[_potx_format_quoted_string($mid[1])][$file][] = $line . ($markdup ? '(dup)' : '');
-      }
-
-      // $t() found, but inside is something which is not a string literal
-      else {
-        _potx_marker_error($file, $line, $functionname, $tokens, $ti);
-      }
-    }
-    $ti++;
-  }
-}
-
-/**
- * Detect all occurances this format_plural calls.
+ * Detect all occurances of format_plural calls.
  *
  * These sequences are searched for:
  *   T_STRING("format_plural") + "(" + ..anything (might be more tokens).. +
@@ -466,102 +461,46 @@ function _potx_find_dollart_calls(&$tokens, $file, &$strings, $markdup = FALSE) 
  *
  * @param $tokens
  *   The current tokens array
+ * @param $tokenlookup
+ *   Helper array to quickly look up tokens
  * @param $file
  *   Name of file parsed
  * @param $strings
  *   Current strings array
  */
-function _potx_find_format_plural_calls(&$tokens, $file, &$strings) {
-
-  $ti = 0;
-  $tc = count($tokens);
-
-  while (($tc - $ti) > 7) {
-
-    list($ctok, $par1) = array($tokens[$ti], $tokens[$ti+1]);
-    if (!is_array($ctok)) {
-      $ti++;
-      continue;
-    }
-    list($type, $string, $line) = $ctok;
-
-    if (($type == T_STRING) && ($string == "format_plural") && ($par1 == "(")) {
-
-      // Eat up everything that is used as the first parameter
-      $tn = $ti+2;
-      $depth = 0;
-      while (!($tokens[$tn] == "," && $depth == 0)) {
-        if ($tokens[$tn] == "(") {
-          $depth++;
+function _potx_find_format_plural_calls(&$tokens, $tokenlookup, $file, &$strings) {
+  if (is_array($tokenlookup['format_plural'])) {
+    foreach ($tokenlookup['format_plural'] as $ti) {
+      list($ctok, $par1) = array($tokens[$ti], $tokens[$ti+1]);
+      list($type, $string, $line) = $ctok;
+      if ($par1 == "(") {
+        // Eat up everything that is used as the first parameter
+        $tn = $ti+2;
+        $depth = 0;
+        while (!($tokens[$tn] == "," && $depth == 0)) {
+          if ($tokens[$tn] == "(") {
+            $depth++;
+          }
+          elseif ($tokens[$tn] == ")") {
+            $depth--;
+          }
+          $tn++;
         }
-        elseif ($tokens[$tn] == ")") {
-          $depth--;
-        }
-        $tn++;
-      }
-
-      // Get further parameters
-      list($comma1, $singular, $comma2, $plural, $par2) = array($tokens[$tn], $tokens[$tn+1], $tokens[$tn+2], $tokens[$tn+3], $tokens[$tn+4]);
-
-      if (($comma2 == ",") && ($par2 == ")") &&
+        // Get further parameters
+        list($comma1, $singular, $comma2, $plural, $par2) = array($tokens[$tn], $tokens[$tn+1], $tokens[$tn+2], $tokens[$tn+3], $tokens[$tn+4]);
+        if (($comma2 == ",") && ($par2 == ")") &&
           (is_array($singular) && ($singular[0] == T_CONSTANT_ENCAPSED_STRING)) &&
           (is_array($plural) && ($plural[0] == T_CONSTANT_ENCAPSED_STRING))) {
-
-        $strings[_potx_format_quoted_string($singular[1]) .
-        "\0" .
-        _potx_format_quoted_string($plural[1])][$file][] = $line;
-      }
-
-      // format_plural() found, but the parameters are not correct
-      else {
-        _potx_marker_error($file, $line, "format_plural", $tokens, $ti);
-      }
-    }
-    $ti++;
-  }
-}
-
-/**
- * Detect all occurances of watchdog calls and get the type names.
- *
- * This sequences is searched for:
- *   T_STRING("watchdog") + "(" + T_CONSTANT_ENCAPSED_STRING + ","
- *
- * @param $tokens
- *   The current tokens array
- * @param $file
- *   Name of file parsed
- * @param $strings
- *   Current strings array
- */
-function _potx_find_watchdog_calls(&$tokens, $file, &$strings) {
-
-  $ti = 0;
-  $tc = count($tokens);
-
-  while (($tc - $ti) > 3) {
-
-    list($ctok, $par, $mid, $rig) = array($tokens[$ti], $tokens[$ti+1], $tokens[$ti+2], $tokens[$ti+3]);
-    if (!is_array($ctok)) {
-      $ti++;
-      continue;
-    }
-    list($type, $string, $line) = $ctok;
-
-    if (($type == T_STRING) && ($string == "watchdog") && ($par == "(")) {
-
-      if (($rig == ",")
-          && (is_array($mid) && ($mid[0] == T_CONSTANT_ENCAPSED_STRING))) {
-
-        $strings[_potx_format_quoted_string($mid[1])][$file][] = $line;
-      }
-
-      // watchdog() found, but inside is something which is not a string literal
-      else {
-        _potx_marker_error($file, $line, "watchdog", $tokens, $ti);
+            $strings[_potx_format_quoted_string($singular[1]) .
+              "\0" .
+              _potx_format_quoted_string($plural[1])][$file][] = $line;
+        }
+        else {
+          // format_plural() found, but the parameters are not correct
+          _potx_marker_error($file, $line, "format_plural", $tokens, $ti);
+        }
       }
     }
-    $ti++;
   }
 }
 
@@ -570,97 +509,173 @@ function _potx_find_watchdog_calls(&$tokens, $file, &$strings) {
  * Note that this will get confused with a similar pattern in a comment,
  * and with dynamic permissions, which need to be accounted for.
  *
- * @param $code
- *   Complete source code of the file parsed
+ * @param $tokens
+ *   The current tokens array
+ * @param $tokenlookup
+ *   Helper array to quickly look up tokens
  * @param $file
- *   Name of the file parsed
+ *   Full path name of file parsed
+ * @param $filebase
+ *   Filenaname of file parsed
  * @param $strings
  *   Current strings array
  */
-function _potx_find_perm_hook($code, $file, &$strings) {
-
-  // Only check for perm hooks with a static array of permission names, nothing else
-  if (preg_match('!^(.+function \\w+_perm\\(\\) \\{\s+return)([^\\}]+)\\}!Us', $code, $hook_code)) {
-    $lines = substr_count($hook_code[1], "\n") + 1;
-    preg_match_all('!(["\'])([a-zA-Z -]+)\1!', $hook_code[2], $items, PREG_PATTERN_ORDER);
-    foreach ($items[2] as $item) {
-      $strings[$item][$file][] = $lines;
+function _potx_find_perm_hook(&$tokens, $tokenlookup, $file, $filebase, &$strings) {
+  if (is_array($tokenlookup[$filebase .'_perm'])) {
+    // Special case for node module, because it uses dynamic permissions.
+    // Include the static permissions by hand. That's about all we can do here.
+    if ($filebase == 'node') {
+      $line = $tokens[$tokenlookup['node_perm'][0]][2];
+      // List from node.module 1.763 (checked in on 2006/12/29 at 21:25:36 by drumm)
+      $nodeperms = array('administer content types', 'administer nodes', 'access content', 'view revisions', 'revert revisions');
+      foreach ($nodeperms as $item) {
+        $strings[$item][$file][] = $line;
+      }
     }
-  }
-
-  // Special case for the dynamic node_perm hook, to include the static permissions at least
-  if (preg_match('!^(.+function node_perm\\(\\) \\{)!Us', $code, $hook_code)) {
-    $lines = substr_count($hook_code[1], "\n") + 1;
-    // List from node.module 1.763 (checked in on 2006/12/29 at 21:25:36 by drumm)
-    $nodeperms = array('administer content types', 'administer nodes', 'access content', 'view revisions', 'revert revisions');
-    foreach ($nodeperms as $item) {
-      $strings[$item][$file][] = $lines;
+    else {
+      foreach ($tokenlookup[$filebase .'_perm'] as $ti) {
+        $tn = $ti;
+        while (is_array($tokens[$tn]) || $tokens[$tn] != '}') {
+          if (is_array($tokens[$tn]) && $tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
+            $strings[_potx_format_quoted_string($tokens[$tn][1])][$file][] = $tokens[$tn][2];
+          }
+          $tn++;
+        }
+      }
     }
   }
 }
+
+/**
+ * Helper function to look up the token closing the current function.
+ *
+ * @param $tokens
+ *   The current tokens array
+ * @param $here
+ *   The token at the function name
+ */
+function _potx_find_end_of_function(&$tokens, $here) {
+  // Seek to open brace.
+  while (is_array($tokens[$here]) || $tokens[$here] != '{') {
+    $here++;
+  }
+  $nesting = 1;
+  while ($nesting > 0) {
+    $here++;
+    if (!is_array($tokens[$here])) {
+      if ($tokens[$here] == '}') {
+        $nesting--;
+      }
+      if ($tokens[$here] == '{') {
+        $nesting++;
+      }
+    }
+  }
+  return $here;
+}
+
+/**
+ * List of menu item titles. Required for Drupal 6.x.
+ *
+ * @param $tokens
+ *   The current tokens array
+ * @param $tokenlookup
+ *   Helper array to quickly look up tokens
+ * @param $file
+ *   Full path name of file parsed
+ * @param $filebase
+ *   Filenaname of file parsed
+ * @param $strings
+ *   Current strings array
+ */
+/*function _potx_find_menu_hook(&$tokens, $tokenlookup, $file, $filebase, &$strings) {
+  if (is_array($tokenlookup[$filebase .'_menu'])) {
+    foreach ($tokenlookup[$filebase .'_menu'] as $ti) {
+      $end = _potx_find_end_of_function($tokens, $ti);
+      $tn = $ti;
+      while ($tn < $end) {
+        if ($tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
+          // TODO: also look up descriptions, this only searches for titles
+          if ($tokens[$tn][1] == "'title'" || $tokens[$tn][1] == '"title"') {
+            if ($tokens[$tn+1][0] == T_DOUBLE_ARROW) {
+              if ($tokens[$tn+2][0] == T_CONSTANT_ENCAPSED_STRING) {
+                $strings[_potx_format_quoted_string($tokens[$tn+2][1])][$file][] = $tokens[$tn+2][2];
+                $tn+=2; // Jump forward by 2.
+              }
+            }
+          }
+        }
+        $tn++;
+      }
+    }
+  }
+}*/
 
 /**
  * Detect oldschool node type names from hook_node_types().
- * Note that this will get confused with a similar pattern in a comment.
  *
- * @param $code
- *   Complete source code of the file parsed
+ * @param $tokens
+ *   The current tokens array
+ * @param $tokenlookup
+ *   Helper array to quickly look up tokens
  * @param $file
- *   Name of the file parsed
+ *   Full path name of file parsed
+ * @param $filebase
+ *   Filenaname of file parsed
  * @param $strings
  *   Current strings array
  */
-function _potx_find_node_types_hook($code, $file, &$strings) {
-
-  if (preg_match('!^(.+function \\w+_node_types\\(\\) \\{\s+return)([^\\}]+)\\}!Us', $code, $hook_code)) {
-    $lines = substr_count($hook_code[1], "\n") + 1;
-    preg_match_all('!(["\'])([0-9a-z-]+)\1!', $hook_code[2], $items, PREG_PATTERN_ORDER);
-    foreach ($items[2] as $item) {
-      $strings[$item][$file][] = $lines;
+function _potx_find_node_types_hook(&$tokens, $tokenlookup, $file, $filebase, &$strings) {
+  if (is_array($tokenlookup[$filebase .'_node_types'])) {
+    foreach ($tokenlookup[$filebase .'_node_types'] as $ti) {
+      $line = $tokens[$ti][2]; // We can actually target the line each token is on, but this is enough.
+      $end = _ptox_find_end_of_function($tokens, $ti);
+      $tn = $ti;
+      while ($tn < $end) {
+        if (is_array($tokens[$tn])) {
+          if ($tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
+            $strings[_potx_format_quoted_string($tokens[$tn][1])][$file][] = $line;
+          }
+        }
+        $tn++;
+      }
     }
   }
 }
 
 /**
- * Detect name of module from known hooks.
- * Note that this will get confused with a similar pattern in a comment.
+ * Get languages names from Drupal's locale.inc.
  *
- * @todo
- *   Help hook is not the best nowadays (it is not implemented by many
- *   modules given the .info files), look for a different solution.
- *
- * @param $code
- *   Complete source code of the file parsed
+ * @param $tokens
+ *   The current tokens array
+ * @param $tokenlookup
+ *   Helper array to quickly look up tokens
  * @param $file
- *   Name of the file parsed
+ *   Full path name of file parsed
  * @param $strings
  *   Current strings array
  */
-function _potx_find_module_name($code, $file, &$strings) {
-  if (preg_match('!function (\\w+)_help\\(!', $code, $module_name) &&
-      !in_array($module_name[1], array('menu_get_active', 'xmlrpc_server_method'))) {
-    $strings[$module_name[1]][$file][] = 0;
-  }
-}
-
-/**
- * Get languages names from locale.inc, if we encounter that file.
- *
- * @param $code
- *   Complete source code of the file parsed
- * @param $file
- *   Name of the file parsed
- * @param $strings
- *   Current strings array
- */
-function _potx_find_language_names($code, $file, &$strings) {
-  if (preg_match("!locale\\.inc$!", $file) &&
-      preg_match("!^(.+function _locale_get_iso639_list\\(\\) {)([^\\}]+)\\}!Us", $code, $langcodes)) {
-    $lines = substr_count($langcodes[1], "\n") + 1;
-    preg_match_all('!array\\((["\'])([^\'"]+)\1!', $langcodes[2], $items, PREG_PATTERN_ORDER);
-    foreach ($items[2] as $item) {
-      $strings[$item][$file][] = $lines;
+function _potx_find_language_names(&$tokens, $tokenlookup, $file, &$strings) {
+  foreach ($tokenlookup['_locale_get_iso639_list'] as $ti) {
+    // Search for the definition of _locale_get_iso639_list(), not where it is called.
+    if ($tokens[$ti-1][0] == T_FUNCTION) {
+      break;
     }
+  }
+    
+  $end = _potx_find_end_of_function($tokens, $ti);
+  $ti += 7; // _locale_get_iso639_list, (, ), {, return, array, (
+  while ($ti < $end) {
+    while ($tokens[$ti][0] != T_ARRAY) {
+      if (!is_array($tokens[$ti]) && $tokens[$ti] == ';') {
+        // We passed the end of the list, break out to function level
+        // to prevent an infinite loop.
+        break 2;
+      }
+      $ti++;
+    }
+    $ti += 2; // array, (
+    $strings[_potx_format_quoted_string($tokens[$ti][1])][$file][] = $tokens[$ti][2];
   }
 }
 
@@ -683,8 +698,8 @@ function _potx_find_version_number($code, $file, &$file_versions) {
 }
 
 /**
- * Add date strings if locale.module is parsed. This cannot be
- * extracted otherwise.
+ * Add date strings, which cannot be extracted otherwise.
+ * This is called for locale.module.
  *
  * @param $file
  *   Name of the file parsed
@@ -692,24 +707,21 @@ function _potx_find_version_number($code, $file, &$file_versions) {
  *   Current strings array
  */
 function _potx_add_date_strings($file, &$strings) {
-  if (preg_match('!(^|/)locale.module$!', $file)) {
-    for ($i = 1; $i <= 12; $i++) {
-      $stamp = mktime(0, 0, 0, $i, 1, 1971);
-      $strings[date("F", $stamp)][$file][] = 0;
-      $strings[date("M", $stamp)][$file][] = 0;
-    }
-
-    for ($i = 0; $i <= 7; $i++) {
-      $stamp = $i * 86400;
-      $strings[date("D", $stamp)][$file][] = 0;
-      $strings[date("l", $stamp)][$file][] = 0;
-    }
+  for ($i = 1; $i <= 12; $i++) {
+    $stamp = mktime(0, 0, 0, $i, 1, 1971);
+    $strings[date("F", $stamp)][$file][] = 0;
+    $strings[date("M", $stamp)][$file][] = 0;
+  }
+  for ($i = 0; $i <= 7; $i++) {
+    $stamp = $i * 86400;
+    $strings[date("D", $stamp)][$file][] = 0;
+    $strings[date("l", $stamp)][$file][] = 0;
   }
 }
 
 /**
- * Add format_interval special strings if common.inc is parsed.
- * This cannot be extracted otherwise.
+ * Add format_interval special strings, which cannot be
+ * extracted otherwise. This is called for common.inc
  *
  * @param $file
  *   Name of the file parsed
@@ -717,18 +729,16 @@ function _potx_add_date_strings($file, &$strings) {
  *   Current strings array
  */
 function _potx_add_format_interval_strings($file, &$strings) {
-  if (preg_match('!(^|/)common.inc$!', $file)) {
-    $components = array(
-      '1 year' => '@count years',
-      '1 week' => '@count weeks',
-      '1 day'  => '@count days',
-      '1 hour' => '@count hours',
-      '1 min'  => '@count min',
-      '1 sec'  => '@count sec');
+  $components = array(
+    '1 year' => '@count years',
+    '1 week' => '@count weeks',
+    '1 day'  => '@count days',
+    '1 hour' => '@count hours',
+    '1 min'  => '@count min',
+    '1 sec'  => '@count sec');
 
-    foreach($components as $singular => $plural) {
-      $strings[$singular."\0".$plural][$file][] = 0;
-    }
+  foreach($components as $singular => $plural) {
+    $strings[$singular."\0".$plural][$file][] = 0;
   }
 }
 
@@ -743,6 +753,8 @@ function _potx_add_format_interval_strings($file, &$strings) {
 function _potx_find_info_file_strings($file, &$strings) {
   $info = array();
 
+  // TODO: update this for Drupal 6.x, where parse_ini_file
+  // is not applicable anymore
   if (file_exists($file)) {
     $info = parse_ini_file($file);
   }

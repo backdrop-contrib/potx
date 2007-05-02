@@ -9,8 +9,8 @@ basically two ways to use the contents of this project:
 
  * Copy potx.inc and potx-cli.php to the directory you would like to 
    generate translation templates for and run php potx-cli.php. 
-   The translation templates will get generated as separate files in 
-   the current directory.
+   The translation templates will get generated in the current 
+   directory.
 
  * Install the module on a Drupal site as you would with any other 
    module. Once potx module is turned on, you can go to the 
@@ -42,15 +42,26 @@ script on all source files that contain translatable strings.
      
 You can try 'php potx-cli.php --help' to get a list of more options.
   
-All files get their own template file unless they contain less than
-ten strings, which will be merged in the general.pot file. This special
-template file also contains all strings that occur more than once in the
-Drupal source files. This will help translators to maintain a single
-translation for them. 
+The contents of files depend on the mode you use. By default, one
+single general.pot file will be generated. You can use the "core"
+mode to generate Drupal core templates (one file per module, small
+files folded into general.pot, .info files folded into general.pot).
+Or you can use the "multiple" mode which is similar to the "core"
+mode, but .info files are folded into their module template files.
+
+In case of "core" and "multiple" mode, the generated general.pot will
+Contain strings from files with less than ten strings, as well as all
+strings that occur more than once in the source files. This will help 
+translators to maintain a single translation for them. 
 
 CREDITS
 ================================================================================
 
 Command line extractor functionality orignally by 
-Jacobo Tarrio <jtarrio [at] alfa21.com> (2003, 2004 Alfa21 Outsourcing)
-Currently maintained by Gabor Hojtsy <gabor [at] hojtsy.hu>
+  Jacobo Tarrio <jtarrio [at] alfa21.com> (2003, 2004 Alfa21 Outsourcing)
+
+Greatly optimized by 
+  Brandon Bergren (2007)
+
+Currently maintained by 
+  Gabor Hojtsy <gabor [at] hojtsy.hu>

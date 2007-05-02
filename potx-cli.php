@@ -2,12 +2,13 @@
 // $Id$
 
 /**
- * @file Translation template generator for Drupal (command line version).
+ * @file
+ *   Translation template generator for Drupal (command line version).
  *
- * Extracts translatable strings from t(), t(,array()), format_plural()
- * and other function calls, plus adds some file specific strings. Only
- * literal strings with no embedded variables can be extracted. Generates
- * POT files, errors are printed on STDERR (in command line mode).
+ *   Extracts translatable strings from t(), t(,array()), format_plural()
+ *   and other function calls, plus adds some file specific strings. Only
+ *   literal strings with no embedded variables can be extracted. Generates
+ *   POT files, errors are printed on STDERR (in command line mode).
  */
 
 // Functions shared with web based interface
@@ -21,33 +22,48 @@ if (!defined("STDERR")) {
   define('STDERR', fopen('php://stderr', 'w'));
 }
 
-$infofolding = FALSE;
+$files = array();
+$mode = POTX_MODE_SINGLE;
 $argv = $GLOBALS['argv'];
 array_shift ($argv);
 if (count($argv)) {
   switch ($argv[0]) {
     case '--help' :
-      print "Drupal translation template generator\n";
-      print "Usage: extractor.php [OPTION]\n\n";
-      print "Possible options:\n";
-      print " --auto             Autodiscovers files in current folder (default)\n";
-      print " --files            Specify a list of files to generate templates for\n";
-      print " --infofold=general Fold .info strings into general.pot (for core)\n";
-      print " --infofold=module  Fold .info strings into module template (for contrib, default)\n";
-      print " --debug            Only perform a 'self test'\n";
-      print " --help             Display this message\n\n";
-      print "You can also drop this file to a folder, and access it from\n";
-      print "your browser. It will generate template files for all Drupal\n";
-      print "files in all subfolders recursively.\n";
+      print <<<END
+Drupal command line translation template generator
+Usage: potx-cli.php [OPTION]
+
+Possible options:
+ --auto
+     Autodiscovers files in current folder (default).
+ --files
+     Specify a list of files to generate templates for.
+ --mode=core
+     Core extraction mode, .info files folded into general.pot.
+ --mode=multiple
+     Multiple file output mode, .info files folded into module pot files.
+ --mode=single
+     Single file output mode, every file folded into the single outpout file (default).
+ --debug
+     Only perform a 'self test'.
+ --help
+     Display this message.
+ 
+END;
       return 1;
       break;
     case '--files' :
       array_shift($argv);
       $files = $argv;
       break;
-    case '--infofold=general' :
-      $infofolding = TRUE;
-      $files = _potx_explore_dir();
+    case '--mode=core' :
+      $mode = POTX_MODE_CORE;
+      break;
+    case '--mode=multiple' :
+      $mode = POTX_MODE_MULTIPLE;
+      break;
+    case '--mode=single' :
+      $mode = POTX_MODE_SINGLE;
       break;
     case '--debug' :
       $files = array(__FILE__);
@@ -57,7 +73,9 @@ if (count($argv)) {
       break;
   }
 }
-else {
+
+// Fall back to --auto, if --files are not specified
+if (empty($files)) {
   $files = _potx_explore_dir();
 }
 
@@ -68,8 +86,8 @@ foreach ($files as $file) {
   _potx_process_file($file, $strings, $file_versions, $installer_strings);
 }
 
-_potx_build_files($strings, $file_versions);
-_potx_build_files($installer_strings, $file_versions, 'installer');
+_potx_build_files($strings, $file_versions, $mode);
+_potx_build_files($installer_strings, $file_versions, POTX_MODE_SINGLE, 'installer');
 _potx_write_files();
 _potx_status("\nDone.\n");
 
