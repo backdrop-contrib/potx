@@ -49,8 +49,10 @@ define('POTX_MODE_SINGLE', 2);
  *   Array to add the identified CVS file versions into
  * @param $installer_strings
  *   Array to add any installer time strings identified
+ * @param $strip_prefix
+ *   An integer denoting the number of chars to strip from filepath for output
  */
-function _potx_process_file($file, &$strings, &$file_versions, &$installer_strings) {
+function _potx_process_file($file, &$strings, &$file_versions, &$installer_strings, $strip_prefix = 0) {
 
   // Figure out the basename and extension to select extraction method.
   $basename = basename($file);
@@ -58,6 +60,9 @@ function _potx_process_file($file, &$strings, &$file_versions, &$installer_strin
 
   // Always grab the CVS version number from the code
   $code = file_get_contents($file);
+  if ($strip_prefix > 0) {
+    $file = substr($file, $strip_prefix);
+  }
   _potx_find_version_number($code, $file, $file_versions);
 
   // The .info files are not PHP code, no need to tokenize.
