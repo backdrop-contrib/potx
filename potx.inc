@@ -220,21 +220,23 @@ function _potx_build_files(&$strings, &$file_versions, $mode = POTX_MODE_SINGLE,
  */
 function _potx_write_files($http_filename = NULL, $content_disposition = 'inline') {
   $output = _potx_store();
-
-  // Merge too small files into general.pot.
-  // Merge all files if generating output for HTTP response.
-  foreach ($output as $file => $content) {
-    if (isset($http_filename) || (count($content) <= 11 && $file != 'general')) {
-      @$output['general'][1] = array_unique(array_merge($output['general'][1], $content[1]));
-      if (!isset($output['general'][0])) {
-        $output['general'][0] = $content[0];
+  
+  // Possibly merge some files if we have more then one.
+  if (count($output) > 1) {
+    foreach ($output as $file => $content) {
+      // Merge too small files into general.pot.
+      if (count($content) <= 11 && $file != 'general') {
+        @$output['general'][1] = array_unique(array_merge($output['general'][1], $content[1]));
+        if (!isset($output['general'][0])) {
+          $output['general'][0] = $content[0];
+        }
+        unset($content[0]);
+        unset($content[1]);
+        foreach ($content as $msgid) {
+          $output['general'][] = $msgid;
+        }
+        unset($output[$file]);
       }
-      unset($content[0]);
-      unset($content[1]);
-      foreach ($content as $msgid) {
-        $output['general'][] = $msgid;
-      }
-      unset($output[$file]);
     }
   }
 
