@@ -1,19 +1,19 @@
 # $Id$
 # -----------------------------------------------------------------------------
-# Japanese translation of Drupal (.module)
+# Japanese translation of Drupal (potx.module)
 #
 # Copyright (c) 2006-2007  Drupal Japan  ( http://drupal.jp/ )  /
 #                          Drupal Nippon ( http://drupon.org/ ) /
 #                          Takafumi      ( jp.drupal@imagine **reverse order**)
 #
 # Generated from file:
-#  potx.module,v 1.1.2.5 2007/03/27 19:40:09 goba
+#  potx.module,v 1.1.2.8 2007/05/02 09:18:15 goba
 #  potx.info,v 1.1.2.3 2007/03/27 19:40:09 goba
 #
 # -----------------------------------------------------------------------------
 msgid ""
 msgstr ""
-"POT-Creation-Date: 2007-04-19 20:07+0900\n"
+"POT-Creation-Date: 2007-05-03 00:31+0900\n"
 "Last-Translator: Takafumi <jp.drupal@imagine **reverse order**>\n"
 "Language-Team: Drupal Japan / Drupal Nippon\n"
 "MIME-Version: 1.0\n"
@@ -46,16 +46,16 @@ msgid "Generates output from all files found in this directory."
 msgstr "このディレクトリで見つかった全ファイルから出力を生成します。"
 
 #: potx.module:181
-msgid "Extract from all modules in directory %dir_name"
-msgstr "%dir_name 内の全モジュールから抽出"
+msgid "Extract from all modules in directory \"@dir_name\""
+msgstr "@dir_name 内の全モジュールから抽出"
 
 #: potx.module:182
 msgid "To extract from a single module in this directory, choose the module entry in the fieldset below."
 msgstr "このディレクトリの単一モジュールから抽出するには、以下からモジュールを選んでください。"
 
 #: potx.module:191
-msgid "Modules in %dir_name"
-msgstr "%dir_name 内のモジュール"
+msgid "Modules in \"@dir_name\""
+msgstr "@dir_name 内のモジュール"
 
 #: potx.module:211
 msgid "Extract from module %module_name"
@@ -71,7 +71,7 @@ msgstr "potx"
 
 #: potx.info:0
 msgid "POT extractor"
-msgstr "POTエキストラクター"
+msgstr "POTエクストラクター"
 
 #: potx.info:0
 msgid "Provides a web interface to extract Gettext templates from the sources of installed modules."
