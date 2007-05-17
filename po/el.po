@@ -1,0 +1,78 @@
+# Greek translation of potx.module
+# $Id$
+# LANGUAGE translation of Drupal (general)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+#  potx.module,v 1.1.2.9 2007/05/02 12:56:31 ray007
+#  potx.info,v 1.1.2.3 2007/03/27 19:40:09 goba
+#
+# Vasileios Lourdas <lourdas_v@yahoo.gr>, 2007.
+msgid ""
+msgstr ""
+"Project-Id-Version: el\n"
+"POT-Creation-Date: 2007-05-17 20:39+0300\n"
+"PO-Revision-Date: 2007-05-17 20:48+0300\n"
+"Last-Translator: Vasileios Lourdas <lourdas_v@yahoo.gr>\n"
+"Language-Team: Ελληνικά <en@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms:  nplurals=2; plural=(n != 1);\n"
+"X-Generator: KBabel 1.11.4\n"
+
+#: potx.module:15
+msgid "Helps to extract pot-files for translations from the sources of installed modules."
+msgstr "Βοηθά στην εξαγωγή αρχείων pot για τις μεταφράσεις από τον πηγαίο κώδικα των εγκατεστημένων αρθρωμάτων."
+
+#: potx.module:17
+msgid "This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object Template file is generated (unlike the output of the command line extractor utility), so you can easily save it and start translation."
+msgstr "Η σελίδα αυτή σας επιτρέπει να δημιουργήσετε αρχεία-πρότυπα μεταφράσεων για τα αρχεία των αρθρωμάτων. Επιλέξτε το άρθρωμα για το οποίο θέλετε να δημιουργήσετε το αρχείο-πρότυπο. Ένα μοναδικό αρχείο Gettext Portable Object Template δημιουργείται (σε αντίθεση με την έξοδο από το εργαλείο εξαγωγής της γραμμής εντολών), ώστε να μπορείτε να το αποθηκεύσετε και να ξεκινήσετε τη μετάφραση."
+
+#: potx.module:30
+msgid "Extract strings"
+msgstr "Εξαγωγή συμβολοσειρών"
+
+#: potx.module:77
+msgid "Extract"
+msgstr "Εξαγωγή"
+
+#: potx.module:168
+msgid "Extract from %module_name module, in directory %dir_name"
+msgstr "Εξαγωγή από το άρθρωμα %module_name, στον κατάλογο %dir_name"
+
+#: potx.module:169
+msgid "Generates output from all files found in this directory."
+msgstr "Δημιουργεί έξοδο από όλα τα αρχεία που υπάρχουν στον κατάλογο."
+
+#: potx.module:184
+msgid "Extract from all modules in directory \"@dir_name\""
+msgstr "Εξαγωγή από όλα τα αρθρώματα στον κατάλογο \"@dir_name\""
+
+#: potx.module:185
+msgid "To extract from a single module in this directory, choose the module entry in the fieldset below."
+msgstr "Για την εξαγωγή από ένα μόνο άρθρωμα σε αυτό τον κατάλογο, επιλέξτε το άρθρωμα στο πεδίο παρακάτω."
+
+#: potx.module:194
+msgid "Modules in \"@dir_name\""
+msgstr "Αρθρώματα στο \"@dir_name\""
+
+#: potx.module:214
+msgid "Extract from module %module_name"
+msgstr "Εξαγωγή από το άρθρωμα %module_name"
+
+#: potx.module:215
+msgid "Extract from files named %module_pattern, in directory %module_dir."
+msgstr "Εξαγωγή από αρχεία με ονόματα %module_pattern, στον κατάλογο %module_dir."
+
+#: potx.module:0
+msgid "potx"
+msgstr "potx"
+
+#: potx.info:0
+msgid "POT extractor"
+msgstr "Εξαγωγέας POT"
+
+#: potx.info:0
+msgid "Provides a web interface to extract Gettext templates from the sources of installed modules."
+msgstr "Παρέχει μια διεπαφή ιστοσελίδας για την εξαγωγή προτύπων Gettext από τον πηγαίο κώδικα των εγκατεστημένων αρθρωμάτων."
+
