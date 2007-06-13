@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: German translation for potx 5.x\n"
 "POT-Creation-Date: 2007-05-01 23:04+0200\n"
-"PO-Revision-Date: 2007-05-01 23:57+0100\n"
+"PO-Revision-Date: 2007-06-13 16:13+0100\n"
 "Last-Translator: Alexander Hass\n"
 "Language-Team: Alexander Hass\n"
 "MIME-Version: 1.0\n"
@@ -35,35 +35,44 @@ msgstr "Zeichenketten extrahieren"
 msgid "Extract"
 msgstr "Extrahieren"
 
-#: potx.module:165
+#: potx.module:168
 msgid "Extract from %module_name module, in directory %dir_name"
 msgstr "Aus dem Modul %module_name im Verzeichnis %dir_name extrahieren"
 
-#: potx.module:166
+#: potx.module:169
 msgid "Generates output from all files found in this directory."
 msgstr "Die Ausgaben von allen in diesem Verzeichnis gefundenen Dateien erzeugen."
 
-#: potx.module:181
+#: potx.module:184
 msgid "Extract from all modules in directory \"@dir_name\""
 msgstr "Aus allen Modulen in „@dir_name“ extrahieren"
 
-#: potx.module:182
+#: potx.module:185
 msgid "To extract from a single module in this directory, choose the module entry in the fieldset below."
 msgstr "Um aus einem einzelnen Modul in diesem Verzeichnis zu extrahieren, kann ein Modul in der unten aufgeführten Feldliste ausgewählt werden."
 
-#: potx.module:191
+#: potx.module:194
 msgid "Modules in \"@dir_name\""
 msgstr "Module in „@dir_name“"
 
-#: potx.module:211
+#: potx.module:214
 msgid "Extract from module %module_name"
 msgstr "Aus dem Modul %module_name extrahieren"
 
-#: potx.module:212
+#: potx.module:215
 msgid "Extract from files named %module_pattern, in directory %module_dir."
 msgstr "Aus den Dateien im Verzeichnis %module_dir mit den Namen %module_pattern extrahieren."
 
 #: potx.module:0
+#: potx.info:0
 msgid "potx"
 msgstr "potx"
+
+#: potx.info:0
+msgid "POT extractor"
+msgstr "POT Extraktor"
+
+#: potx.info:0
+msgid "Provides a web interface to extract Gettext templates from the sources of installed modules."
+msgstr "Bietet eine Weboberfläche, um Gettext Vorlagen aus den Quellen der installierten Module zu extrahieren."
 
