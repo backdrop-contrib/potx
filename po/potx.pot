@@ -1,14 +1,16 @@
 # $Id$
 #
-# LANGUAGE translation of Drupal (potx.module)
+# LANGUAGE translation of Drupal (general)
 # Copyright YEAR NAME <EMAIL@ADDRESS>
-# Generated from file: potx.module,v 1.1.2.7 2007/05/01 15:29:24 goba
+# Generated from files:
+#  potx.module,v 1.1.2.9 2007/05/02 12:56:31 ray007
+#  potx.info,v 1.1.2.3 2007/03/27 19:40:09 goba
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
-"POT-Creation-Date: 2007-05-01 23:52+0200\n"
+"POT-Creation-Date: 2007-06-13 16:09+0200\n"
 "PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
 "Last-Translator: NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
@@ -33,35 +35,43 @@ msgstr ""
 msgid "Extract"
 msgstr ""
 
-#: potx.module:165
+#: potx.module:168
 msgid "Extract from %module_name module, in directory %dir_name"
 msgstr ""
 
-#: potx.module:166
+#: potx.module:169
 msgid "Generates output from all files found in this directory."
 msgstr ""
 
-#: potx.module:181
+#: potx.module:184
 msgid "Extract from all modules in directory \"@dir_name\""
 msgstr ""
 
-#: potx.module:182
+#: potx.module:185
 msgid "To extract from a single module in this directory, choose the module entry in the fieldset below."
 msgstr ""
 
-#: potx.module:191
+#: potx.module:194
 msgid "Modules in \"@dir_name\""
 msgstr ""
 
-#: potx.module:211
+#: potx.module:214
 msgid "Extract from module %module_name"
 msgstr ""
 
-#: potx.module:212
+#: potx.module:215
 msgid "Extract from files named %module_pattern, in directory %module_dir."
 msgstr ""
 
-#: potx.module:0
+#: potx.module:0 potx.info:0
 msgid "potx"
+msgstr ""
+
+#: potx.info:0
+msgid "POT extractor"
+msgstr ""
+
+#: potx.info:0
+msgid "Provides a web interface to extract Gettext templates from the sources of installed modules."
 msgstr ""
 
