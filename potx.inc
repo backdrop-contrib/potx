@@ -792,14 +792,13 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback) {
     $info = parse_ini_file($file_path);
   }
 
-  // We need everything but dependencies and version, see
-  // _module_parse_info_file() on what is a possible .info
-  // file setting.
-  unset($info['dependencies']);
-  unset($info['version']);
-
-  foreach ($info as $key => $item) {
-    $save_callback($item, $file_name);
+  // We need the name, description and package values. Others,
+  // like core and PHP compatibility, timestamps or versions
+  // are not to be translated.
+  foreach (array('name', 'description', 'package') as $key) {
+    if (isset($info[$key])) {
+      $save_callback($info[$key], $file_name);
+    }
   }
 }
 
