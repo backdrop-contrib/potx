@@ -201,6 +201,11 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
   $strings  = $save_callback(NULL, NULL, 0, $string_mode);
   $versions = $version_callback();
 
+  // We might not have any string recorded in this string mode.
+  if (!is_array($strings)) {
+    return;
+  }
+
   foreach ($strings as $string => $file_info) {
     // Build a compact list of files this string occured in.
     $occured = $file_list = array();
@@ -823,10 +828,11 @@ function _potx_explore_dir($path = '', $basename = '*') {
       $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
     }
   }
-  // Skip the file of the CLI interface, because it contains
-  // test strings, we don't need on an automated run.
+  // Skip our own files, because we don't want to get strings from them 
+  // to appear in the output, especially with the command line interface.
+  // TODO: fix this to be able to autogenerate templates for potx itself.
   foreach ($files as $id => $file_name) {
-    if (preg_match('!potx-cli.php$!', $file_name)) {
+    if (preg_match('!(potx-cli.php|potx.inc)$!', $file_name)) {
       unset($files[$id]);
     }
   }
