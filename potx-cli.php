@@ -114,7 +114,7 @@ $p = format_plural(embedded_function_call($count), "one day", "@count days");
 function embedded_function_call($dummy) { return 12; }
 
 function potxcli_perm() {
-  return array("access extrator data", 'administer extractor data');
+  return array("access potx data", 'administer potx data');
 }
 
 function potxcli_help($section = 'default') {
