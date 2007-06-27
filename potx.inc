@@ -662,7 +662,7 @@ function _potx_find_node_types_hook($file, $filebase, $save_callback) {
   if (is_array($_potx_lookup[$filebase .'_node_types'])) {
     foreach ($_potx_lookup[$filebase .'_node_types'] as $ti) {
       $line = $_potx_tokens[$ti][2]; // We can actually target the line each token is on, but this is enough.
-      $end = _ptox_find_end_of_function($ti);
+      $end = _potx_find_end_of_function($ti);
       $tn = $ti;
       while ($tn < $end) {
         if (is_array($_potx_tokens[$tn])) {
