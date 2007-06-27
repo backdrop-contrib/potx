@@ -3,307 +3,265 @@
 
 /**
  * @file
- *   Common functions used by the web and command line interface.
+ *   Extraction API used by the web and command line interface.
+ *
+ *   This include file implements the default string and file version
+ *   storage as well as formatting of POT files for web download or
+ *   file system level creation. The strings, versions and file contents
+ *   are handled with global variables to reduce the memory overhead
+ *   of passing them around. Custom string and version saving functions
+ *   can be implemented to use the functionality provided here as an
+ *   API for Drupal code to translatable string conversion.
+ *
+ *   The potx-cli.php script can be used with this include file as
+ *   a command line interface to string extraction. The potx.module
+ *   can be used as a web interface for manual extraction.
+ *
+ *   For a module using potx as an extraction API, but providing more
+ *   sophisticated functionality on top of it, look into the
+ *   'Localization server' module: http://drupal.org/project/l10n_server
  */
+
+/**
+ * Silence status reports.
+ */
+define('POTX_STATUS_SILENT', 0);
+
+/**
+ * Drupal message based status reports.
+ */
+define('POTX_STATUS_MESSAGE', 1);
 
 /**
  * Command line status reporting:
  *  - status to standard output
  *  - errors to standard error
  */
-define('POTX_STATUS_CLI',    0);
-
-/**
- * Silence status reports.
- */
-define('POTX_STATUS_SILENT', 1);
+define('POTX_STATUS_CLI', 2);
 
 /**
  * Core parsing mode:
  *  - .info files folded into general.pot
  *  - separate files generated for modules
  */
-define('POTX_MODE_CORE', 0);
+define('POTX_BUILD_CORE', 0);
 
 /**
  * Multiple files mode:
  *  - .info files folded into their module pot files
  *  - separate files generated for modules
  */
-define('POTX_MODE_MULTIPLE', 1);
+define('POTX_BUILD_MULTIPLE', 1);
 
 /**
  * Single file mode:
  *  - all files folded into one pot file
  */
-define('POTX_MODE_SINGLE', 2);
+define('POTX_BUILD_SINGLE', 2);
+
+/**
+ * Save string to both installer and runtime collection.
+ */
+define('POTX_STRING_BOTH', 0);
+
+/**
+ * Save string to installer collection only.
+ */
+define('POTX_STRING_INSTALLER', 1);
+
+/**
+ * Save string to runtime collection only.
+ */
+define('POTX_STRING_RUNTIME', 2);
 
 /**
  * Process a file and put extracted information to the given parameters.
  *
- * @param $file
- *   Name of file to process
- * @param $strings
- *   Array to add the extracted strings into
- * @param $file_versions
- *   Array to add the identified CVS file versions into
- * @param $installer_strings
- *   Array to add any installer time strings identified
+ * @param $file_path
+ *   Comlete path to file to process.
+ * @param $save_callback
+ *   Callback function to use to save the collected strings.
+ * @param $version_callback
+ *   Callback function to use to save collected version numbers.
  * @param $strip_prefix
- *   An integer denoting the number of chars to strip from filepath for output
+ *   An integer denoting the number of chars to strip from filepath for output.
  */
-function _potx_process_file($file, &$strings, &$file_versions, &$installer_strings, $strip_prefix = 0) {
+function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_potx_save_string', $version_callback = '_potx_save_version') {
+  global $_potx_tokens, $_potx_lookup;
 
   // Figure out the basename and extension to select extraction method.
-  $basename = basename($file);
+  $basename = basename($file_path);
   list($filebase, $fileext) = explode(".", $basename, 2);
 
   // Always grab the CVS version number from the code
-  $code = file_get_contents($file);
-  if ($strip_prefix > 0) {
-    $file = substr($file, $strip_prefix);
-  }
-  _potx_find_version_number($code, $file, $file_versions);
+  $code = file_get_contents($file_path);
+  $file_name = $strip_prefix > 0 ? substr($file_path, $strip_prefix) : $file_path;
+  _potx_find_version_number($code, $file_name, $version_callback);
 
   // The .info files are not PHP code, no need to tokenize.
   if ($fileext == 'info') {
-    _potx_find_info_file_strings($file, $strings);
+    _potx_find_info_file_strings($file_path, $file_name, $save_callback);
     return;
   }
 
   // Extract raw PHP language tokens.
   $raw_tokens = token_get_all($code);
+  unset($code);
 
   // Remove whitespace and possible HTML (the later in templates for example),
   // count line numbers so we can include them in the output.
-  $tokens = array();
-  $tokenlookup = array();
-  $tokencounter = 0;
-  $lineno = 1;
-  foreach ($raw_tokens as $tok) {
-    if ((!is_array($tok)) || (($tok[0] != T_WHITESPACE) && ($tok[0] != T_INLINE_HTML))) {
-      if (is_array($tok)) {
-        $tok[] = $lineno;
+  $_potx_tokens = array();
+  $_potx_lookup = array();
+  $token_number = 0;
+  $line_number = 1;
+  foreach ($raw_tokens as $token) {
+    if ((!is_array($token)) || (($token[0] != T_WHITESPACE) && ($token[0] != T_INLINE_HTML))) {
+      if (is_array($token)) {
+        $token[] = $line_number;
          // Fill array for finding token offsets quickly.
-         if ($tok[0] == T_STRING || ($tok[0] == T_VARIABLE && $tok[1] == '$t')) {
-           if (!isset($tokenlookup[$tok[1]])) {
-             $tokenlookup[$tok[1]] = array();
+         if ($token[0] == T_STRING || ($token[0] == T_VARIABLE && $token[1] == '$t')) {
+           if (!isset($_potx_lookup[$token[1]])) {
+             $_potx_lookup[$token[1]] = array();
            }
-           $tokenlookup[$tok[1]][] = $tokencounter;
+           $_potx_lookup[$token[1]][] = $token_number;
          }
       }
-      $tokens[] = $tok;
-      $tokencounter++;
+      $_potx_tokens[] = $token;
+      $token_number++;
     }
     // Collect line numbers.
-    if (is_array($tok)) {
-      $lineno += count(split("\n", $tok[1])) - 1;
-    } else {
-      $lineno += count(split("\n", $tok)) - 1;
+    if (is_array($token)) {
+      $line_number += count(split("\n", $token[1])) - 1;
+    }
+    else {
+      $line_number += count(split("\n", $token)) - 1;
     }
   }
   unset($raw_tokens);
 
   // Regular t() calls with different usages.
-  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings);
-  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings, '_locale_import_message');
-  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings, '$t');
-  
-  // Installer related strings.
-  _potx_find_t_calls($tokens, $tokenlookup, $file, $installer_strings, 'st');
-  _potx_find_t_calls($tokens, $tokenlookup, $file, $installer_strings, '_locale_import_message', TRUE);
-  _potx_find_t_calls($tokens, $tokenlookup, $file, $installer_strings, '$t', TRUE);
+  _potx_find_t_calls($file_name, $save_callback);
+  _potx_find_t_calls($file_name, $save_callback, '_locale_import_message', POTX_STRING_BOTH);
+  _potx_find_t_calls($file_name, $save_callback, '$t', POTX_STRING_BOTH);
+  _potx_find_t_calls($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
 
   // Watchdog calls have their first argument translated in Drupal 5.x.
   // TODO: need to update this for Drupal 6.x
-  _potx_find_t_calls($tokens, $tokenlookup, $file, $strings, 'watchdog');
+  _potx_find_t_calls($file_name, $save_callback, 'watchdog');
 
   // Plurals need unique parsing.
-  _potx_find_format_plural_calls($tokens, $tokenlookup, $file, $strings);
+  _potx_find_format_plural_calls($file_name, $save_callback);
 
   if ($fileext == 'module') {
-    _potx_find_perm_hook($tokens, $tokenlookup, $file, $filebase, $strings);
+    _potx_find_perm_hook($file_name, $filebase, $save_callback);
     // TODO: this is required for Drupal 6.x.
-    // _potx_find_menu_hook($tokens, $tokenlookup, $file, $filebase, $strings);
-    _potx_find_node_types_hook($tokens, $tokenlookup, $file, $filebase, $strings);
+    // _potx_find_menu_hook($file, $filebase, $save_callback);
+    _potx_find_node_types_hook($file_name, $filebase, $save_callback);
     // Add the module name.
-    $strings[$filebase][$file][] = 0;
+    $save_callback($filebase, $file_name);
   }
   
   if ($fileext == 'theme') {
     // Add the theme name.
-    $strings[$filebase][$file][] = 0;
+    $save_callback($filebase, $file_name);
   }
 
   // Special handling of some Drupal core files.
   if ($basename == 'locale.inc') {
-    //_potx_find_language_names($tokens, $tokenlookup, $file, $strings);
+    _potx_find_language_names($file_name, $save_callback);
   }
   if ($basename == 'locale.module') {
-    _potx_add_date_strings($file, $strings);
+    _potx_add_date_strings($file_name, $save_callback);
   }
   if ($basename == 'common.inc') {
-    _potx_add_format_interval_strings($file, $strings);
+    _potx_add_format_interval_strings($file_name, $save_callback);
   }
 }
 
 /**
  * Creates complete file strings with _potx_store()
  *
- * @param $strings
- *   The strings gathered
- * @param $file_versions
- *   Original source file versions to output into the templates
- * @param $mode
+ * @param $string_mode
+ *   Strings to generate files for: POTX_STRING_RUNTIME or POTX_STRING_INSTALLER.
+ * @param $build_mode
  *   Storage mode used: single, multiple or core
- * @param $forcename
+ * @param $force_name
  *   Forces a given file name to get used, if single mode is on, without extension
+ * @param $save_callback
+ *   Callback used to save strings previously.
+ * @param $version_callback
+ *   Callback used to save versions previously.
+ * @param $header_callback
+ *   Callback to invoke to get the POT header.
  */
-function _potx_build_files(&$strings, &$file_versions, $mode = POTX_MODE_SINGLE, $forcename = 'general') {
+function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POTX_BUILD_SINGLE, $force_name = 'general',  $save_callback = '_potx_save_string', $version_callback = '_potx_save_version', $header_callback = '_potx_get_header') {
+  global $_potx_store;
 
-  foreach ($strings as $str => $fileinfo) {
-    // Build a compact list of files this strings occured in.
-    $occured = $filelist = array();
-    foreach ($fileinfo as $file => $lines) {
-      $occured[] = "$file:" . join(";", $lines);
-      if (isset($file_versions[$file])) {
-        $filelist[] = $file_versions[$file];
+  // Get strings and versions by reference.
+  $strings  = $save_callback(NULL, NULL, 0, $string_mode);
+  $versions = $version_callback();
+
+  foreach ($strings as $string => $file_info) {
+    // Build a compact list of files this string occured in.
+    $occured = $file_list = array();
+    foreach ($file_info as $file => $lines) {
+      $occured[] = "$file:". join(';', $lines);
+      if (isset($versions[$file])) {
+        $file_list[] = $versions[$file];
       }
     }
 
     // Mark duplicate strings (both translated in the app and in the installer).
-    $occurances = join(" ", $occured);
-    if (strpos($occurances, '(dup)') !== FALSE) {
-      $occurances = '(duplicate) ' . str_replace('(dup)', '', $occurances);
+    $comment = join(" ", $occured);
+    if (strpos($comment, '(dup)') !== FALSE) {
+      $comment = '(duplicate) '. str_replace('(dup)', '', $comment);
     }
-    $output = "#: $occurances\n";
+    $output = "#: $comment\n";
 
     // File name forcing in single mode.
-    if ($mode == POTX_MODE_SINGLE) {
-      $filename = $forcename;
+    if ($build_mode == POTX_BUILD_SINGLE) {
+      $file_name = $force_name;
     }
     // Store .info file strings either in general.pot or the module pot file,
     // depending on the mode used.
-    elseif (strpos($occurances, '.info')) {
-      $filename = ($mode == POTX_MODE_CORE ? 'general' : str_replace('.info', '.module', $filename));
+    elseif (strpos($comment, '.info')) {
+      $file_name = ($build_mode == POTX_BUILD_CORE ? 'general' : str_replace('.info', '.module', $file_name));
     }
     // Else if occured more than once, store in general.pot.
     else {
-      $filename = (count($occured) > 1 ? 'general' : $file);
+      $file_name = (count($occured) > 1 ? 'general' : $file);
     }
 
-    if (strpos($str, "\0") === FALSE) {
-      $output .= "msgid \"$str\"\n";
-      $output .= "msgstr \"\"\n";
-    }
-    else {
+    if (strpos($string, "\0") !== FALSE) {
       // Plural strings have a null byte delimited format.
-      list ($singular, $plural) = explode("\0", $str);
+      list($singular, $plural) = explode("\0", $string);
       $output .= "msgid \"$singular\"\n";
       $output .= "msgid_plural \"$plural\"\n";
       $output .= "msgstr[0] \"\"\n";
       $output .= "msgstr[1] \"\"\n";
     }
+    else {
+      // Simple strings.
+      $output .= "msgid \"$string\"\n";
+      $output .= "msgstr \"\"\n";
+    }
     $output .= "\n";
 
-    // Store the generated output in the given file.
-    _potx_store($filename, $output, $filelist);
-  }
-}
-
-/**
- * Write out generated files to the current folder.
- *
- * @param $http_filename
- *   File name for content-disposition header in case of usage
- *   over HTTP. If not given, files are written to the local filesystem.
- * @param $content_disposition
- *   See RFC2183. 'inline' or 'attachment', with a default of
- *   'inline'. Only used if $http_filename is set.
- * @todo
- *   Look into whether multiple files can be output via HTTP
- */
-function _potx_write_files($http_filename = NULL, $content_disposition = 'inline') {
-  $output = _potx_store();
-  
-  // Possibly merge some files if we have more then one.
-  if (count($output) > 1) {
-    foreach ($output as $file => $content) {
-      // Merge too small files into general.pot.
-      if (count($content) <= 11 && $file != 'general') {
-        @$output['general'][1] = array_unique(array_merge($output['general'][1], $content[1]));
-        if (!isset($output['general'][0])) {
-          $output['general'][0] = $content[0];
-        }
-        unset($content[0]);
-        unset($content[1]);
-        foreach ($content as $msgid) {
-          $output['general'][] = $msgid;
-        }
-        unset($output[$file]);
-      }
-    }
-  }
-
-  // Generate file lists and output files.
-  foreach ($output as $file => $content) {
-    $file = str_replace('.', '-', preg_replace('<[/]?([a-zA-Z]*/)*>', '', $file)) .'.pot';
-    $filelist = $content[1];
-    unset($content[1]);
-    if (count($filelist) > 1) {
-      $filelist = "Generated from files:\n#  " . join("\n#  ", $filelist);
-    }
-    elseif (count($filelist) == 1) {
-      $filelist = "Generated from file: " . join("", $filelist);
+    // Store the generated output in the given file storage.
+    if (!isset($_potx_store[$file_name])) {
+      $_potx_store[$file_name] = array(
+        'header'  => $header_callback($file_name),
+        'sources' => $file_list,
+        'strings' => $output,
+        'count'   => 1,
+      );
     }
     else {
-      $filelist = "No version information was available in the source files.";
-    }
-    $content = str_replace("--VERSIONS--", $filelist, join("", $content));
-
-    if ($http_filename) {
-      header('Content-Type: text/plain; charset=utf-8');
-      header('Content-Transfer-Encoding: 8bit');
-      header("Content-Disposition: $content_disposition; filename=$http_filename");
-      print $content;
-      return;
-    }
-
-    $fp = fopen($file, 'w');
-    fwrite($fp, $content);
-    fclose($fp);
-  }
-}
-
-/**
- * Store a POT file chunk into a given file.
- *
- * @param $file
- *   File name to store $input in, or NULL if the stored array should be returned.
- * @param $input
- *   File chunk to store in $file.
- * @param $filelist
- *   A list of files from which the current chunk was generated
- */
-function _potx_store($file = NULL, $input = NULL, $filelist = array()) {
-  static $storage = array();
-  if (isset($file)) {
-    if (isset($storage[$file])) {
       // Maintain a list of unique file names.
-      $storage[$file][1] = array_unique(array_merge($storage[$file][1], $filelist));
-      $storage[$file][] = $input;
+      $_potx_store[$file_name]['sources']  = array_unique(array_merge($_potx_store[$file_name]['sources'], $file_list));
+      $_potx_store[$file_name]['strings'] .= $output;
+      $_potx_store[$file_name]['count']   += 1;
     }
-    else {
-      $storage[$file] = array();
-      // You can override the header (with a language team specific variant for example),
-      // if you generate missing templates for yourself, and would like to work quickly.
-      $storage[$file][0] = (function_exists('_potx_get_header_custom') ? _potx_get_header_custom($file) : _potx_get_header($file));
-      $storage[$file][1] = $filelist;
-      $storage[$file][2] = $input;
-    }
-  }
-  else {
-    return $storage;
   }
 }
 
@@ -314,9 +272,9 @@ function _potx_store($file = NULL, $input = NULL, $filelist = array()) {
  *   Name of POT file to generate header for
  */
 function _potx_get_header($file) {
-  $output  = '# $' . 'Id' . '$' . "\n";
+  $output  = '# $'.'Id'.'$'."\n";
   $output .= "#\n";
-  $output .= "# LANGUAGE translation of Drupal (". $file .")\n";
+  $output .= '# LANGUAGE translation of Drupal ('. $file .")\n";
   $output .= "# Copyright YEAR NAME <EMAIL@ADDRESS>\n";
   $output .= "# --VERSIONS--\n";
   $output .= "#\n";
@@ -336,6 +294,71 @@ function _potx_get_header($file) {
 }
 
 /**
+ * Write out generated files to the current folder.
+ *
+ * @param $http_filename
+ *   File name for content-disposition header in case of usage
+ *   over HTTP. If not given, files are written to the local filesystem.
+ * @param $content_disposition
+ *   See RFC2183. 'inline' or 'attachment', with a default of
+ *   'inline'. Only used if $http_filename is set.
+ * @todo
+ *   Look into whether multiple files can be output via HTTP.
+ */
+function _potx_write_files($http_filename = NULL, $content_disposition = 'inline') {
+  global $_potx_store;
+  
+  // Possibly merge some files if we have more then one.
+  if (count($_potx_store) > 1) {
+    foreach ($_potx_store as $file => $contents) {
+      // Merge too small files into general.pot.
+      if ($contents['count'] < 10 && $file != 'general') {
+        if (!isset($_potx_store['general'])) {
+          $_potx_store['general'] = $contents;
+        }
+        else {
+          $_potx_store['general']['sources']  = array_unique(array_merge($_potx_store['general']['sources'], $contents['sources']));
+          $_potx_store['general']['strings'] .= $contents['strings'];
+        }
+        // Drop this file, contents are integrated into general.pot.
+        unset($_potx_store[$file]);
+      }
+    }
+  }
+
+  // Generate file lists and output files.
+  foreach ($_potx_store as $file => $contents) {
+    // Build replacement for file listing.
+    if (count($contents['sources']) > 1) {
+      $filelist = "Generated from files:\n#  " . join("\n#  ", $contents['sources']);
+    }
+    elseif (count($contents['sources']) == 1) {
+      $filelist = "Generated from file: " . join('', $contents['sources']);
+    }
+    else {
+      $filelist = 'No version information was available in the source files.';
+    }
+    $output = str_replace('--VERSIONS--', $filelist, $contents['header'] . $contents['strings']);
+
+    if ($http_filename) {
+      // HTTP output.
+      header('Content-Type: text/plain; charset=utf-8');
+      header('Content-Transfer-Encoding: 8bit');
+      header("Content-Disposition: $content_disposition; filename=$http_filename");
+      print $output;
+      return;
+    }
+    else {
+      // Local file output, flatten directory structure.
+      $file = str_replace('.', '-', preg_replace('<[/]?([a-zA-Z]*/)*>', '', $file)) .'.pot';
+      $fp = fopen($file, 'w');
+      fwrite($fp, $output);
+      fclose($fp);
+    }
+  }
+}
+
+/**
  * Escape quotes in a strings depending on the surrounding
  * quote type used.
  *
@@ -347,7 +370,8 @@ function _potx_format_quoted_string($str) {
   $str = substr($str, 1, -1);
   if ($quo == '"') {
     $str = stripcslashes($str);
-  } else {
+  }
+  else {
     $str = strtr($str, array("\\'" => "'", "\\\\" => "\\"));
   }
   return addcslashes($str, "\0..\37\\\"");
@@ -362,56 +386,62 @@ function _potx_format_quoted_string($str) {
  *   Line number of error
  * @param $marker
  *   Function name with which the error was identified
- * @param $tokens
- *   The current state of the tokens array
  * @param $ti
  *   Index on the token array
  */
-function _potx_marker_error($file, $line, $marker, &$tokens, $ti) {
-  _potx_status("Invalid marker content in $file:$line\n* $marker(", TRUE);
+function _potx_marker_error($file, $line, $marker, $ti) {
+  global $_potx_tokens;
+  
+  $tokens = '';
   $ti += 2;
-  $tc = count($tokens);
+  $tc = count($_potx_tokens);
   $par = 1;
   while ((($tc - $ti) > 0) && $par) {
-    if (is_array($tokens[$ti])) {
-      _potx_status($tokens[$ti][1], TRUE);
-    } else {
-      _potx_status($tokens[$ti], TRUE);
-      if ($tokens[$ti] == "(") {
+    if (is_array($_potx_tokens[$ti])) {
+      $tokens .= $_potx_tokens[$ti][1];
+    }
+    else {
+      $tokens .= $_potx_tokens[$ti];
+      if ($_potx_tokens[$ti] == "(") {
         $par++;
       }
-      if ($tokens[$ti] == ")") {
+      else if ($_potx_tokens[$ti] == ")") {
         $par--;
       }
     }
     $ti++;
   }
-  _potx_status("\n\n", TRUE);
+  _potx_status(t("Invalid marker content in %filename:%lineno\n* %marker(%tokens\n\n", array('%filename' => $file, '%lineno' => $line, '%marker' => $marker, '%tokens' => $tokens)), 'error');
 }
 
 /**
- * Status notification function
+ * Status notification function.
  *
  * @param $text
  *   Text of status message, or POTX_STATUS_* constant
  *   to set status reporting mode.
- * @param $error
- *   TRUE if the message is an error
+ * @param $type
+ *   Type of message: 'status' or 'error'.
  */
-function _potx_status($text, $error = FALSE) {
+function _potx_status($text, $type = 'status') {
   static $reporting = POTX_STATUS_CLI;
   
-  // Modify status, if given.
+  // Modify reporting type, if given.
   if (!is_string($text)) {
     $reporting = $text;
+    return;
   }
-  
-  if ($reporting == POTX_STATUS_CLI) {
-    if ($error) {
-      fwrite(STDERR, $text);
-    }
-    else {
-      print $text;
+  else {
+    switch ($reporting) {
+      case POTX_STATUS_MESSAGE:
+        drupal_set_message($text, $type);
+        break;
+      case POTX_STATUS_CLI:
+        fwrite($type == 'error' ? STDERR : STDOUT, $text);
+        break;
+      case POTX_STATUS_SILENT:
+        // Do nothing.
+        break;
     }
   }
 }
@@ -420,38 +450,36 @@ function _potx_status($text, $error = FALSE) {
  * Detect all occurances of t()-like calls.
  *
  * These sequences are searched for:
- *   T_STRING("$functionname") + "(" + T_CONSTANT_ENCAPSED_STRING + ")"
- *   T_STRING("$functionname") + "(" + T_CONSTANT_ENCAPSED_STRING + ","
+ *   T_STRING("$function_name") + "(" + T_CONSTANT_ENCAPSED_STRING + ")"
+ *   T_STRING("$function_name") + "(" + T_CONSTANT_ENCAPSED_STRING + ","
  *
- * @param $tokens
- *   The current tokens array
- * @param $tokenlookup
- *   Helper array to quickly look up tokens
  * @param $file
- *   Name of file parsed
- * @param $strings
- *   Current strings array
- * @param functionname
- *   The name of the function to look for (could be t, $t, st, watchdog or any other t-like function)
- * @param $markdup
- *   Mark strings as duplicate (ie. possibly having translations elsewhere already).
- *   Used for installer strings, which get to a different file, so duplicate checking
- *   is not evident with standard gettext tools.
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ * @param function_name
+ *   The name of the function to look for (could be 't', '$t', 'st',
+ *   'watchdog' or any other t-like function).
+ * @param $string_mode
+ *   String mode to use: POTX_STRING_INSTALLER, POTX_STRING_RUNTIME or
+ *   POTX_STRING_BOTH.
  */
-function _potx_find_t_calls(&$tokens, $tokenlookup, $file, &$strings, $functionname = 't', $markdup = FALSE) {
-  // Lookup tokens by function name
-  if (is_array($tokenlookup[$functionname])) {
-    foreach ($tokenlookup[$functionname] as $ti) {
-      list($ctok, $par, $mid, $rig) = array($tokens[$ti], $tokens[$ti+1], $tokens[$ti+2], $tokens[$ti+3]);
+function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string_mode = POTX_STRING_RUNTIME) {
+  global $_potx_tokens, $_potx_lookup;
+  
+  // Lookup tokens by function name.
+  if (is_array($_potx_lookup[$function_name])) {
+    foreach ($_potx_lookup[$function_name] as $ti) {
+      list($ctok, $par, $mid, $rig) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3]);
       list($type, $string, $line) = $ctok;
       if ($par == "(") {
         if (in_array($rig, array(")", ","))
           && (is_array($mid) && ($mid[0] == T_CONSTANT_ENCAPSED_STRING))) {
-            $strings[_potx_format_quoted_string($mid[1])][$file][] = $line . ($markdup ? '(dup)' : '');
+            $save_callback(_potx_format_quoted_string($mid[1]), $file, $line, $string_mode);
         }
         else {
-          // $functionname() found, but inside is something which is not a string literal
-          _potx_marker_error($file, $line, $functionname, $tokens, $ti);
+          // $function_name() found, but inside is something which is not a string literal.
+          _potx_marker_error($file, $line, $function_name, $ti);
         }
       }
     }
@@ -466,45 +494,45 @@ function _potx_find_t_calls(&$tokens, $tokenlookup, $file, &$strings, $functionn
  *   "," + T_CONSTANT_ENCAPSED_STRING +
  *   "," + T_CONSTANT_ENCAPSED_STRING + ")"
  *
- * @param $tokens
- *   The current tokens array
- * @param $tokenlookup
- *   Helper array to quickly look up tokens
  * @param $file
- *   Name of file parsed
- * @param $strings
- *   Current strings array
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
  */
-function _potx_find_format_plural_calls(&$tokens, $tokenlookup, $file, &$strings) {
-  if (is_array($tokenlookup['format_plural'])) {
-    foreach ($tokenlookup['format_plural'] as $ti) {
-      list($ctok, $par1) = array($tokens[$ti], $tokens[$ti+1]);
+function _potx_find_format_plural_calls($file, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  if (is_array($_potx_lookup['format_plural'])) {
+    foreach ($_potx_lookup['format_plural'] as $ti) {
+      list($ctok, $par1) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1]);
       list($type, $string, $line) = $ctok;
       if ($par1 == "(") {
         // Eat up everything that is used as the first parameter
-        $tn = $ti+2;
+        $tn = $ti + 2;
         $depth = 0;
-        while (!($tokens[$tn] == "," && $depth == 0)) {
-          if ($tokens[$tn] == "(") {
+        while (!($_potx_tokens[$tn] == "," && $depth == 0)) {
+          if ($_potx_tokens[$tn] == "(") {
             $depth++;
           }
-          elseif ($tokens[$tn] == ")") {
+          elseif ($_potx_tokens[$tn] == ")") {
             $depth--;
           }
           $tn++;
         }
         // Get further parameters
-        list($comma1, $singular, $comma2, $plural, $par2) = array($tokens[$tn], $tokens[$tn+1], $tokens[$tn+2], $tokens[$tn+3], $tokens[$tn+4]);
+        list($comma1, $singular, $comma2, $plural, $par2) = array($_potx_tokens[$tn], $_potx_tokens[$tn+1], $_potx_tokens[$tn+2], $_potx_tokens[$tn+3], $_potx_tokens[$tn+4]);
         if (($comma2 == ",") && ($par2 == ")") &&
           (is_array($singular) && ($singular[0] == T_CONSTANT_ENCAPSED_STRING)) &&
           (is_array($plural) && ($plural[0] == T_CONSTANT_ENCAPSED_STRING))) {
-            $strings[_potx_format_quoted_string($singular[1]) .
-              "\0" .
-              _potx_format_quoted_string($plural[1])][$file][] = $line;
+            $save_callback(
+              _potx_format_quoted_string($singular[1]) ."\0". _potx_format_quoted_string($plural[1]),
+              $file,
+              $line
+            );
         }
         else {
-          // format_plural() found, but the parameters are not correct
-          _potx_marker_error($file, $line, "format_plural", $tokens, $ti);
+          // format_plural() found, but the parameters are not correct.
+          _potx_marker_error($file, $line, "format_plural", $ti);
         }
       }
     }
@@ -516,35 +544,33 @@ function _potx_find_format_plural_calls(&$tokens, $tokenlookup, $file, &$strings
  * Note that this will get confused with a similar pattern in a comment,
  * and with dynamic permissions, which need to be accounted for.
  *
- * @param $tokens
- *   The current tokens array
- * @param $tokenlookup
- *   Helper array to quickly look up tokens
  * @param $file
- *   Full path name of file parsed
+ *   Full path name of file parsed.
  * @param $filebase
- *   Filenaname of file parsed
- * @param $strings
- *   Current strings array
+ *   Filenaname of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
  */
-function _potx_find_perm_hook(&$tokens, $tokenlookup, $file, $filebase, &$strings) {
-  if (is_array($tokenlookup[$filebase .'_perm'])) {
+function _potx_find_perm_hook($file, $filebase, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  if (is_array($_potx_lookup[$filebase .'_perm'])) {
     // Special case for node module, because it uses dynamic permissions.
     // Include the static permissions by hand. That's about all we can do here.
     if ($filebase == 'node') {
-      $line = $tokens[$tokenlookup['node_perm'][0]][2];
+      $line = $_potx_tokens[$_potx_lookup['node_perm'][0]][2];
       // List from node.module 1.763 (checked in on 2006/12/29 at 21:25:36 by drumm)
       $nodeperms = array('administer content types', 'administer nodes', 'access content', 'view revisions', 'revert revisions');
       foreach ($nodeperms as $item) {
-        $strings[$item][$file][] = $line;
+        $save_callback($item, $file, $line);
       }
     }
     else {
-      foreach ($tokenlookup[$filebase .'_perm'] as $ti) {
+      foreach ($_potx_lookup[$filebase .'_perm'] as $ti) {
         $tn = $ti;
-        while (is_array($tokens[$tn]) || $tokens[$tn] != '}') {
-          if (is_array($tokens[$tn]) && $tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
-            $strings[_potx_format_quoted_string($tokens[$tn][1])][$file][] = $tokens[$tn][2];
+        while (is_array($_potx_tokens[$tn]) || $_potx_tokens[$tn] != '}') {
+          if (is_array($_potx_tokens[$tn]) && $_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
+            $save_callback(_potx_format_quoted_string($_potx_tokens[$tn][1]), $file, $_potx_tokens[$tn][2]);
           }
           $tn++;
         }
@@ -556,24 +582,24 @@ function _potx_find_perm_hook(&$tokens, $tokenlookup, $file, $filebase, &$string
 /**
  * Helper function to look up the token closing the current function.
  *
- * @param $tokens
- *   The current tokens array
  * @param $here
  *   The token at the function name
  */
-function _potx_find_end_of_function(&$tokens, $here) {
+function _potx_find_end_of_function($here) {
+  global $_potx_tokens;
+
   // Seek to open brace.
-  while (is_array($tokens[$here]) || $tokens[$here] != '{') {
+  while (is_array($_potx_tokens[$here]) || $_potx_tokens[$here] != '{') {
     $here++;
   }
   $nesting = 1;
   while ($nesting > 0) {
     $here++;
-    if (!is_array($tokens[$here])) {
-      if ($tokens[$here] == '}') {
+    if (!is_array($_potx_tokens[$here])) {
+      if ($_potx_tokens[$here] == '}') {
         $nesting--;
       }
-      if ($tokens[$here] == '{') {
+      if ($_potx_tokens[$here] == '{') {
         $nesting++;
       }
     }
@@ -584,29 +610,31 @@ function _potx_find_end_of_function(&$tokens, $here) {
 /**
  * List of menu item titles. Required for Drupal 6.x.
  *
- * @param $tokens
- *   The current tokens array
- * @param $tokenlookup
- *   Helper array to quickly look up tokens
  * @param $file
- *   Full path name of file parsed
+ *   Full path name of file parsed.
  * @param $filebase
- *   Filenaname of file parsed
- * @param $strings
- *   Current strings array
+ *   Filenaname of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
  */
-/*function _potx_find_menu_hook(&$tokens, $tokenlookup, $file, $filebase, &$strings) {
-  if (is_array($tokenlookup[$filebase .'_menu'])) {
-    foreach ($tokenlookup[$filebase .'_menu'] as $ti) {
-      $end = _potx_find_end_of_function($tokens, $ti);
+/*function _potx_find_menu_hook($file, $filebase, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+  
+  if (is_array($_potx_lookup[$filebase .'_menu'])) {
+    foreach ($_potx_lookup[$filebase .'_menu'] as $ti) {
+      $end = _potx_find_end_of_function($ti);
       $tn = $ti;
       while ($tn < $end) {
-        if ($tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
+        if ($_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
           // TODO: also look up descriptions, this only searches for titles
-          if ($tokens[$tn][1] == "'title'" || $tokens[$tn][1] == '"title"') {
-            if ($tokens[$tn+1][0] == T_DOUBLE_ARROW) {
-              if ($tokens[$tn+2][0] == T_CONSTANT_ENCAPSED_STRING) {
-                $strings[_potx_format_quoted_string($tokens[$tn+2][1])][$file][] = $tokens[$tn+2][2];
+          if ($_potx_tokens[$tn][1] == "'title'" || $_potx_tokens[$tn][1] == '"title"') {
+            if ($_potx_tokens[$tn+1][0] == T_DOUBLE_ARROW) {
+              if ($_potx_tokens[$tn+2][0] == T_CONSTANT_ENCAPSED_STRING) {
+                $save_callback(
+                  _potx_format_quoted_string($_potx_tokens[$tn+2][1]),
+                  $file,
+                  $_potx_tokens[$tn+2][2]
+                );
                 $tn+=2; // Jump forward by 2.
               }
             }
@@ -621,27 +649,25 @@ function _potx_find_end_of_function(&$tokens, $here) {
 /**
  * Detect oldschool node type names from hook_node_types().
  *
- * @param $tokens
- *   The current tokens array
- * @param $tokenlookup
- *   Helper array to quickly look up tokens
  * @param $file
- *   Full path name of file parsed
+ *   Full path name of file parsed.
  * @param $filebase
- *   Filenaname of file parsed
- * @param $strings
- *   Current strings array
+ *   Filenaname of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
  */
-function _potx_find_node_types_hook(&$tokens, $tokenlookup, $file, $filebase, &$strings) {
-  if (is_array($tokenlookup[$filebase .'_node_types'])) {
-    foreach ($tokenlookup[$filebase .'_node_types'] as $ti) {
-      $line = $tokens[$ti][2]; // We can actually target the line each token is on, but this is enough.
-      $end = _ptox_find_end_of_function($tokens, $ti);
+function _potx_find_node_types_hook($file, $filebase, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  if (is_array($_potx_lookup[$filebase .'_node_types'])) {
+    foreach ($_potx_lookup[$filebase .'_node_types'] as $ti) {
+      $line = $_potx_tokens[$ti][2]; // We can actually target the line each token is on, but this is enough.
+      $end = _ptox_find_end_of_function($ti);
       $tn = $ti;
       while ($tn < $end) {
-        if (is_array($tokens[$tn])) {
-          if ($tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
-            $strings[_potx_format_quoted_string($tokens[$tn][1])][$file][] = $line;
+        if (is_array($_potx_tokens[$tn])) {
+          if ($_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
+            $save_callback(_potx_format_quoted_string($_potx_tokens[$tn][1]), $file, $line);
           }
         }
         $tn++;
@@ -653,28 +679,26 @@ function _potx_find_node_types_hook(&$tokens, $tokenlookup, $file, $filebase, &$
 /**
  * Get languages names from Drupal's locale.inc.
  *
- * @param $tokens
- *   The current tokens array
- * @param $tokenlookup
- *   Helper array to quickly look up tokens
  * @param $file
  *   Full path name of file parsed
- * @param $strings
- *   Current strings array
+ * @param $save_callback
+ *   Callback function used to save strings.
  */
-function _potx_find_language_names(&$tokens, $tokenlookup, $file, &$strings) {
-  foreach ($tokenlookup['_locale_get_iso639_list'] as $ti) {
+function _potx_find_language_names($file, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  foreach ($_potx_lookup['_locale_get_iso639_list'] as $ti) {
     // Search for the definition of _locale_get_iso639_list(), not where it is called.
-    if ($tokens[$ti-1][0] == T_FUNCTION) {
+    if ($_potx_tokens[$ti-1][0] == T_FUNCTION) {
       break;
     }
   }
     
-  $end = _potx_find_end_of_function($tokens, $ti);
+  $end = _potx_find_end_of_function($ti);
   $ti += 7; // _locale_get_iso639_list, (, ), {, return, array, (
   while ($ti < $end) {
-    while ($tokens[$ti][0] != T_ARRAY) {
-      if (!is_array($tokens[$ti]) && $tokens[$ti] == ';') {
+    while ($_potx_tokens[$ti][0] != T_ARRAY) {
+      if (!is_array($_potx_tokens[$ti]) && $_potx_tokens[$ti] == ';') {
         // We passed the end of the list, break out to function level
         // to prevent an infinite loop.
         break 2;
@@ -682,25 +706,25 @@ function _potx_find_language_names(&$tokens, $tokenlookup, $file, &$strings) {
       $ti++;
     }
     $ti += 2; // array, (
-    $strings[_potx_format_quoted_string($tokens[$ti][1])][$file][] = $tokens[$ti][2];
+    $save_callback(_potx_format_quoted_string($_potx_tokens[$ti][1]), $file, $_potx_tokens[$ti][2]);
   }
 }
 
 /**
  * Get the exact CVS version number from the file, so we can
- * push that into the pot.
+ * push that into the generated output.
  *
  * @param $code
- *   Complete source code of the file parsed
+ *   Complete source code of the file parsed.
  * @param $file
- *   Name of the file parsed
- * @param $file_versions
- *   The array storing file version information
+ *   Name of the file parsed.
+ * @param $version_callback
+ *   Callback used to save the version information.
  */
-function _potx_find_version_number($code, $file, &$file_versions) {
-  // Prevent CVS from replacing this pattern with actual info
+function _potx_find_version_number($code, $file, $version_callback) {
+  // Prevent CVS from replacing this pattern with actual info.
   if (preg_match('!\\$I' . 'd: ([^\\$]+) Exp \\$!', $code, $version_info)) {
-    $file_versions[$file] = $version_info[1];
+    $version_callback($version_info[1], $file);
   }
 }
 
@@ -709,20 +733,20 @@ function _potx_find_version_number($code, $file, &$file_versions) {
  * This is called for locale.module.
  *
  * @param $file
- *   Name of the file parsed
- * @param $strings
- *   Current strings array
+ *   Name of the file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
  */
-function _potx_add_date_strings($file, &$strings) {
+function _potx_add_date_strings($file, $save_callback) {
   for ($i = 1; $i <= 12; $i++) {
     $stamp = mktime(0, 0, 0, $i, 1, 1971);
-    $strings[date("F", $stamp)][$file][] = 0;
-    $strings[date("M", $stamp)][$file][] = 0;
+    $save_callback(date("F", $stamp), $file);
+    $save_callback(date("M", $stamp), $file);
   }
   for ($i = 0; $i <= 7; $i++) {
     $stamp = $i * 86400;
-    $strings[date("D", $stamp)][$file][] = 0;
-    $strings[date("l", $stamp)][$file][] = 0;
+    $save_callback(date("D", $stamp), $file);
+    $save_callback(date("l", $stamp), $file);
   }
 }
 
@@ -731,11 +755,11 @@ function _potx_add_date_strings($file, &$strings) {
  * extracted otherwise. This is called for common.inc
  *
  * @param $file
- *   Name of the file parsed
- * @param $strings
- *   Current strings array
+ *   Name of the file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
  */
-function _potx_add_format_interval_strings($file, &$strings) {
+function _potx_add_format_interval_strings($file, $save_callback) {
   $components = array(
     '1 year' => '@count years',
     '1 week' => '@count weeks',
@@ -745,25 +769,27 @@ function _potx_add_format_interval_strings($file, &$strings) {
     '1 sec'  => '@count sec');
 
   foreach($components as $singular => $plural) {
-    $strings[$singular."\0".$plural][$file][] = 0;
+    $save_callback($singular ."\0". $plural, $file);
   }
 }
 
 /**
  * Parse an .info file and add relevant strings to the list.
  *
- * @param $file
- *   Name of the file parsed
+ * @param $file_path
+ *   Complete file path to load contents with.
+ * @param $file_name
+ *   Stripped file name to use in outpout.
  * @param $strings
  *   Current strings array
  */
-function _potx_find_info_file_strings($file, &$strings) {
+function _potx_find_info_file_strings($file_path, $file_name, $save_callback) {
   $info = array();
 
   // TODO: update this for Drupal 6.x, where parse_ini_file
   // is not applicable anymore
-  if (file_exists($file)) {
-    $info = parse_ini_file($file);
+  if (file_exists($file_path)) {
+    $info = parse_ini_file($file_path);
   }
 
   // We need everything but dependencies and version, see
@@ -773,7 +799,7 @@ function _potx_find_info_file_strings($file, &$strings) {
   unset($info['version']);
 
   foreach ($info as $key => $item) {
-    $strings[$item][$file][] = 0;
+    $save_callback($item, $file_name);
   }
 }
 
@@ -798,10 +824,79 @@ function _potx_explore_dir($path = '', $basename = '*') {
       $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
     }
   }
-  // Skip the file of the CLI interface, because it contains test strings,
-  // we don't need on a normal run.
-  if (($id = array_search('potx-cli.php', $files)) !== FALSE) {
-    unset($files[$id]);
+  // Skip the file of the CLI interface, because it contains
+  // test strings, we don't need on an automated run.
+  foreach ($files as $id => $file_name) {
+    if (preg_match('!potx-cli.php$!', $file_name)) {
+      unset($files[$id]);
+    }
   }
   return $files;
+}
+
+/**
+ * Default $version_callback used by the potx system. Saves values
+ * to a global array to reduce memory consumption problems when
+ * passing around big chunks of values.
+ *
+ * @param $value
+ *   The ersion number value of $file. If NULL, the collected
+ *   values are returned.
+ * @param $file
+ *   Name of file where the version information was found.
+ */
+function _potx_save_version($value = NULL, $file = NULL) {
+  global $_potx_versions;
+  
+  if (isset($value)) {
+    $_potx_versions[$file] = $value;
+  }
+  else {
+    return $_potx_versions;
+  }
+}
+
+/**
+ * Default $save_callback used by the potx system. Saves values
+ * to global arrays to reduce memory consumption problems when
+ * passing around big chunks of values.
+ *
+ * @param $value
+ *   The string value. If NULL, the array of collected values
+ *   are returned for the given $string_mode.
+ * @param $file
+ *   Name of file where the string was found.
+ * @param $line
+ *   Line number where the string was found.
+ * @param $string_mode
+ *   String mode: POTX_STRING_INSTALLER, POTX_STRING_RUNTIME
+ *   or POTX_STRING_BOTH.
+ */
+function _potx_save_string($value = NULL, $file = NULL, $line = 0, $string_mode = POTX_STRING_RUNTIME) {
+  global $_potx_strings, $_potx_install;
+  
+  if (isset($value)) {
+    switch ($string_mode) {
+      case POTX_STRING_BOTH:
+        $_potx_install[$value][$file][] = $line .' (dup)';
+        // Break intentionally missing.
+      case POTX_STRING_RUNTIME:
+        $_potx_strings[$value][$file][] = $line;
+        break;
+      case POTX_STRING_INSTALLER:
+        $_potx_install[$value][$file][] = $line;
+        break;
+    }
+  }
+  else {
+    return ($string_mode == POTX_STRING_RUNTIME ? $_potx_strings : $_potx_install);
+  }
+}
+
+if (!function_exists('t')) {
+  // If invoked outside of Drupal, t() will not exist, but
+  // used to format the error message, so we provide a replacement.
+  function t($string, $args = array()) {
+    return strtr($string, $args);
+  }
 }

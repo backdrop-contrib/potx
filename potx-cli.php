@@ -8,7 +8,7 @@
  *   Extracts translatable strings from t(), t(,array()), format_plural()
  *   and other function calls, plus adds some file specific strings. Only
  *   literal strings with no embedded variables can be extracted. Generates
- *   POT files, errors are printed on STDERR (in command line mode).
+ *   POT files, errors are printed on STDERR.
  */
 
 // Functions shared with web based interface
@@ -23,7 +23,7 @@ if (!defined("STDERR")) {
 }
 
 $files = array();
-$mode = POTX_MODE_SINGLE;
+$build_mode = POTX_BUILD_SINGLE;
 $argv = $GLOBALS['argv'];
 array_shift ($argv);
 if (count($argv)) {
@@ -57,13 +57,13 @@ END;
       $files = $argv;
       break;
     case '--mode=core' :
-      $mode = POTX_MODE_CORE;
+      $build_mode = POTX_BUILD_CORE;
       break;
     case '--mode=multiple' :
-      $mode = POTX_MODE_MULTIPLE;
+      $build_mode = POTX_BUILD_MULTIPLE;
       break;
     case '--mode=single' :
-      $mode = POTX_MODE_SINGLE;
+      $build_mode = POTX_BUILD_SINGLE;
       break;
     case '--debug' :
       $files = array(__FILE__);
@@ -79,15 +79,13 @@ if (empty($files)) {
   $files = _potx_explore_dir();
 }
 
-$strings = $file_versions = $installer_strings = array();
-
 foreach ($files as $file) {
   _potx_status("Processing $file...\n");
-  _potx_process_file($file, $strings, $file_versions, $installer_strings);
+  _potx_process_file($file);
 }
 
-_potx_build_files($strings, $file_versions, $mode);
-_potx_build_files($installer_strings, $file_versions, POTX_MODE_SINGLE, 'installer');
+_potx_build_files(POTX_STRING_RUNTIME, $build_mode);
+_potx_build_files(POTX_STRING_INSTALLER, POTX_BUILD_SINGLE, 'installer');
 _potx_write_files();
 _potx_status("\nDone.\n");
 

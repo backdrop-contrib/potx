@@ -90,7 +90,7 @@ function potx_select_form_submit($form_id, &$form) {
   require_once('potx.inc');
 
   // Silence status messages.
-  _potx_status(POTX_STATUS_SILENT);
+  _potx_status(POTX_STATUS_MESSAGE);
 
   // $form['module'] either contains a specific module file name
   // with path, or a directory name for a module or a module suite.
@@ -129,11 +129,10 @@ function potx_select_form_submit($form_id, &$form) {
   */
 
   // Collect every string in affected files. Installer related strings are discared.
-  $strings = $file_versions = $installer_strings = array();
   foreach ($files as $file) {
-    _potx_process_file($file, $strings, $file_versions, $installer_strings, $strip_prefix);
+    _potx_process_file($file, $strip_prefix);
   }
-  _potx_build_files($strings, $file_versions, POTX_MODE_SINGLE);
+  _potx_build_files();
   _potx_write_files($outputname, 'attachment');
 
   exit;
