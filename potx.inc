@@ -753,6 +753,10 @@ function _potx_add_date_strings($file, $save_callback) {
     $save_callback(date("D", $stamp), $file);
     $save_callback(date("l", $stamp), $file);
   }
+  $save_callback('am', $file);
+  $save_callback('pm', $file);
+  $save_callback('AM', $file);
+  $save_callback('PM', $file);
 }
 
 /**
