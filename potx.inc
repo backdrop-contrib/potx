@@ -355,7 +355,7 @@ function _potx_write_files($http_filename = NULL, $content_disposition = 'inline
     }
     else {
       // Local file output, flatten directory structure.
-      $file = str_replace('.', '-', preg_replace('<[/]?([a-zA-Z]*/)*>', '', $file)) .'.pot';
+      $file = str_replace('.', '-', preg_replace('![/]?([a-zA-Z_0-9]*/)*!', '', $file)) .'.pot';
       $fp = fopen($file, 'w');
       fwrite($fp, $output);
       fclose($fp);
