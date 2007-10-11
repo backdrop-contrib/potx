@@ -12,7 +12,7 @@
  */
 
 // Functions shared with web based interface
-include 'potx.inc';
+include dirname(__FILE__) .'/potx.inc';
 
 // We need a lot of resources probably
 @ini_set('memory_limit', '16M');
