@@ -473,7 +473,7 @@ function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string
   global $_potx_tokens, $_potx_lookup;
   
   // Lookup tokens by function name.
-  if (is_array($_potx_lookup[$function_name])) {
+  if (isset($_potx_lookup[$function_name])) {
     foreach ($_potx_lookup[$function_name] as $ti) {
       list($ctok, $par, $mid, $rig) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3]);
       list($type, $string, $line) = $ctok;
@@ -507,7 +507,7 @@ function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string
 function _potx_find_format_plural_calls($file, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
 
-  if (is_array($_potx_lookup['format_plural'])) {
+  if (isset($_potx_lookup['format_plural'])) {
     foreach ($_potx_lookup['format_plural'] as $ti) {
       list($ctok, $par1) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1]);
       list($type, $string, $line) = $ctok;
@@ -559,7 +559,7 @@ function _potx_find_format_plural_calls($file, $save_callback) {
 function _potx_find_perm_hook($file, $filebase, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
 
-  if (is_array($_potx_lookup[$filebase .'_perm'])) {
+  if (isset($_potx_lookup[$filebase .'_perm'])) {
     // Special case for node module, because it uses dynamic permissions.
     // Include the static permissions by hand. That's about all we can do here.
     if ($filebase == 'node') {
@@ -664,7 +664,7 @@ function _potx_find_end_of_function($here) {
 function _potx_find_node_types_hook($file, $filebase, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
 
-  if (is_array($_potx_lookup[$filebase .'_node_types'])) {
+  if (isset($_potx_lookup[$filebase .'_node_types'])) {
     foreach ($_potx_lookup[$filebase .'_node_types'] as $ti) {
       $line = $_potx_tokens[$ti][2]; // We can actually target the line each token is on, but this is enough.
       $end = _potx_find_end_of_function($ti);
