@@ -193,8 +193,13 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
  *   Callback used to save versions previously.
  * @param $header_callback
  *   Callback to invoke to get the POT header.
+ * @param $template_export_langcode
+ *   Language code if the template should have language dependent content
+ *   (like plural formulas and language name) included.
+ * @param $translation_export_langcode
+ *   Language code if translations should also be exported.
  */
-function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POTX_BUILD_SINGLE, $force_name = 'general',  $save_callback = '_potx_save_string', $version_callback = '_potx_save_version', $header_callback = '_potx_get_header') {
+function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POTX_BUILD_SINGLE, $force_name = 'general',  $save_callback = '_potx_save_string', $version_callback = '_potx_save_version', $header_callback = '_potx_get_header', $template_export_langcode = NULL, $translation_export_langcode = NULL) {
   global $_potx_store;
 
   // Get strings and versions by reference.
@@ -242,20 +247,30 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
       list($singular, $plural) = explode("\0", $string);
       $output .= "msgid \"$singular\"\n";
       $output .= "msgid_plural \"$plural\"\n";
-      $output .= "msgstr[0] \"\"\n";
-      $output .= "msgstr[1] \"\"\n";
+      if (isset($translation_export_langcode)) {
+        $output .= _potx_translation_export($translation_export_langcode, $singular, $plural);
+      }
+      else {
+        $output .= "msgstr[0] \"\"\n";
+        $output .= "msgstr[1] \"\"\n";
+      }
     }
     else {
       // Simple strings.
       $output .= "msgid \"$string\"\n";
-      $output .= "msgstr \"\"\n";
+      if (isset($translation_export_langcode)) {
+        $output .= _potx_translation_export($translation_export_langcode, $string);
+      }
+      else {
+        $output .= "msgstr \"\"\n";
+      }
     }
     $output .= "\n";
 
     // Store the generated output in the given file storage.
     if (!isset($_potx_store[$file_name])) {
       $_potx_store[$file_name] = array(
-        'header'  => $header_callback($file_name),
+        'header'  => $header_callback($file_name, $template_export_langcode, $translation_export_langcode),
         'sources' => $file_list,
         'strings' => $output,
         'count'   => 1,
@@ -271,15 +286,88 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
 }
 
 /**
+ * Export translations with a specific language.
+ *
+ * @param $translation_export_langcode
+ *   Language code if translations should also be exported.
+ * @param $string
+ *   String or singular version if $plural was provided.
+ * @param $plural
+ *   Plural version of singular string.
+ */
+function _potx_translation_export($translation_export_langcode, $string, $plural = NULL) {
+  include_once 'includes/locale.inc';
+  
+  if (!isset($plural)) {
+    // Single string to look translation up for.
+    if ($translation = db_result(db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.locale = '%s'", $string, $translation_export_langcode))) {
+      return 'msgstr '. _locale_export_print($translation);
+    }
+    return "msgstr \"\"\n";
+  }
+  
+  else {
+    // String with plural variants. Fill up source string array first.
+    $strings = array();
+    $number_of_plurals = db_result(db_query("SELECT plurals FROM {locales_meta} WHERE locale = '%s'", $translation_export_langcode));
+    $plural_index = 0;
+    while ($plural_index < $number_of_plurals) {
+      if ($plural_index == 0) {
+        // Add the singular version.
+        $strings[] = $string;
+      }
+      elseif ($plural_index == 1) {
+        // Only add plural version if required.
+        $strings[] = $plural;
+      }
+      else {
+        // More plural versions only if required, with the lookup source
+        // string modified as imported into the database.
+        $strings[] = str_replace('@count', '@count['. $plural_index .']', $plural);
+      }
+      $plural_index++;
+    }
+    
+    $output = '';
+    if (count($strings)) {
+      // Source string array was done, so export translations.
+      foreach ($strings as $index => $string) {
+        if ($translation = db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.locale = '%s'", $string, $translation_export_langcode)) {
+          $output .= 'msgstr['. $index .'] '. _locale_export_print(_locale_export_remove_plural($translation->translation));
+        }
+        else {
+          $output .= "msgstr[". $index ." \"\"\n";
+        }
+      }
+    }
+    else {
+      // No plural information was recorded, so export empty placeholders.
+      $output .= "msgstr[0] \"\"\n";
+      $output .= "msgstr[1] \"\"\n";
+    }
+    return $output;
+  }
+}
+
+/**
  * Returns a header generated for a given file
  *
  * @param $file
  *   Name of POT file to generate header for
+ * @param $template_export_langcode
+ *   Language code if the template should have language dependent content
+ *   (like plural formulas and language name) included.
  */
-function _potx_get_header($file) {
+function _potx_get_header($file, $template_export_langcode = NULL) {
+  // We only have language to use if we should export with that langcode.
+  $language = NULL;
+  if (isset($template_export_langcode)) {
+    $language = db_fetch_object(db_query("SELECT locale, name, plurals, formula FROM {locales_meta} WHERE locale = '%s'", $template_export_langcode));
+  }
+
   $output  = '# $'.'Id'.'$'."\n";
   $output .= "#\n";
-  $output .= '# LANGUAGE translation of Drupal ('. $file .")\n";
+  $output .= '# '. (isset($language) ? $language->name : 'LANGUAGE') .' translation of Drupal ('. $file .")\n";
   $output .= "# Copyright YEAR NAME <EMAIL@ADDRESS>\n";
   $output .= "# --VERSIONS--\n";
   $output .= "#\n";
@@ -287,14 +375,19 @@ function _potx_get_header($file) {
   $output .= "msgid \"\"\n";
   $output .= "msgstr \"\"\n";
   $output .= "\"Project-Id-Version: PROJECT VERSION\\n\"\n";
-  $output .= "\"POT-Creation-Date: " . date("Y-m-d H:iO") . "\\n\"\n";
-  $output .= "\"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\\n\"\n";
+  $output .= "\"POT-Creation-Date: ". date("Y-m-d H:iO") . "\\n\"\n";
+  $output .= "\"PO-Revision-Date: ". (isset($language) ? date("Y-m-d H:iO") : 'YYYY-mm-DD HH:MM+ZZZZ') ."\\n\"\n";
   $output .= "\"Last-Translator: NAME <EMAIL@ADDRESS>\\n\"\n";
-  $output .= "\"Language-Team: LANGUAGE <EMAIL@ADDRESS>\\n\"\n";
+  $output .= "\"Language-Team: ". (isset($language) ? $language->name : 'LANGUAGE') ." <EMAIL@ADDRESS>\\n\"\n";
   $output .= "\"MIME-Version: 1.0\\n\"\n";
   $output .= "\"Content-Type: text/plain; charset=utf-8\\n\"\n";
   $output .= "\"Content-Transfer-Encoding: 8bit\\n\"\n";
-  $output .= "\"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\\n\"\n\n";
+  if (isset($language->formula) && isset($language->plurals)) {
+    $output .= "\"Plural-Forms: nplurals=". $language->plurals ."; plural=". strtr($language->formula, array('$' => '')) .";\\n\"\n\n";
+  }
+  else {
+    $output .= "\"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\\n\"\n\n";
+  }
   return $output;
 }
 

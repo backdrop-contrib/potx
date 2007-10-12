@@ -50,27 +50,31 @@ function potx_select_form() {
   $modules = _potx_module_list();
   _potx_build_module_form($form, $modules);
 
-  /*
   // Generate translation file for a specific language if possible.
   $supported = locale_supported_languages();
   $names = $supported['name'];
   if (count($names) > 1) {
-    $options = array('pot' => t('Translation template file'));
+    $options = array('n/a' => t('Language independent template'));
     foreach ($names as $langcode => $name) {
-      // Skip English for PO generation.
+      // Skip English, as we should not have translations for this language.
       if ($langcode == 'en') {
         continue;
       }
-      $options[$langcode] = t('Translation file for !langname', array('!langname' => $name));
+      $options[$langcode] = t('Template file for !langname translations', array('!langname' => t($name)));
     }
-    $form['type'] = array(
+    $form['langcode'] = array(
       '#type' => 'radios',
-      '#title' => t('Extract type'),
+      '#title' => t('Template language'),
       '#default_value' => 'pot',
       '#options' => $options,
-      '#description' => t('Choose to create a pot-file or a po-file filled with drupal-translations'),
+      '#description' => t('Export a language idependent or language dependent (plural forms, language team name, etc.) template.'),
     );
-  }*/
+    $form['translations'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Include translations'),
+      '#description' => t('Include translations of strings in the file generated. Not applicable for language independent templates.')
+    );
+  }
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -81,13 +85,22 @@ function potx_select_form() {
 }
 
 /**
+ * Validation handler for potx module selection form.
+ */
+function potx_select_form_validate($form_id, $form) {
+  if (empty($form['module'])) {
+    form_set_error('', t('You should select a module to export.'));
+  }
+}
+
+/**
  * Generate translation templates for the requested module.
  */
 function potx_select_form_submit($form_id, &$form) {
 
   // This could take some time.
   @set_time_limit(0);
-  require_once('potx.inc');
+  include_once drupal_get_path('module', 'potx') . '/potx.inc';
 
   // Silence status messages.
   _potx_status(POTX_STATUS_MESSAGE);
@@ -107,32 +120,36 @@ function potx_select_form_submit($form_id, &$form) {
     $filename = basename($pathinfo['basename'], '.module');
     $files = _potx_explore_dir($pathinfo['dirname'] . '/', $filename);
     $strip_prefix = 1 + strlen($pathinfo['dirname']);
-    $outputname = $filename . '.pot';
+    $outputname = $filename;
   }
   // A directory name was requested.
   else {
     $files = _potx_explore_dir($form['module'] . '/');
     $strip_prefix = 1 + strlen($form['module']);
-    $outputname = $pathinfo['basename'] . '.pot';
+    $outputname = $pathinfo['basename'];
   }
   
-  /*
-  // Template or translation file generation.
-  $langcode = NULL;
-  if (isset($form['type']) && ($form['type'] != 'pot')) {
-    $langcode = $form['type'];
-    $httpout .= ".$langcode.po";
+  // Decide on template or translation file generation.
+  $template_langcode = $translation_langcode = NULL;
+  if (isset($form['langcode']) && ($form['langcode'] != 'n/a')) {
+    $template_langcode = $form['langcode'];
+    $outputname .= '.'. $template_langcode;
+    if (isset($form['translations'])) {
+      $translation_langcode = $template_langcode;
+      $outputname .= '.po';
+    }
   }
   else {
-    $httpout .= '.pot';
+    $outputname .= '.pot';
   }
-  */
-
+  
   // Collect every string in affected files. Installer related strings are discared.
   foreach ($files as $file) {
     _potx_process_file($file, $strip_prefix);
   }
-  _potx_build_files();
+  // Need to include full parameter list to get to passing the language codes.
+  _potx_build_files(POTX_STRING_RUNTIME, POTX_BUILD_SINGLE, 'general', '_potx_save_string', '_potx_save_version', '_potx_get_header', $template_langcode, $translation_langcode);
+  
   _potx_write_files($outputname, 'attachment');
 
   exit;
