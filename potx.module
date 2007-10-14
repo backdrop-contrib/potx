@@ -2,7 +2,13 @@
 // $Id$
 
 /**
- * @file Gettext translation template extractor.
+ * @file
+ *   Gettext translation template and translation extractor.
+ *
+ *   This module helps people extract translatable strings from Drupal source
+ *   code. The user interface allows translators to choose which part of the
+ *   current Drupal instance to translate. The module also provides an API for
+ *   other modules (such as l10n_server) to use.
  */
 
 /**
@@ -10,9 +16,6 @@
  */
 function potx_help($section) {
   switch ($section) {
-    case 'admin/help#potx':
-    case 'admin/modules#description':
-      return t('Helps to extract pot-files for translations from the sources of installed modules.');
     case 'admin/settings/locale/potx':
       return t('This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object Template file is generated (unlike the output of the command line extractor utility), so you can easily save it and start translation.');
   }
@@ -23,7 +26,6 @@ function potx_help($section) {
  */
 function potx_menu($may_cache) {
   $items = array();
-
   if ($may_cache) {
     $items[] = array(
       'path' => 'admin/settings/locale/potx',
@@ -40,9 +42,6 @@ function potx_menu($may_cache) {
 
 /**
  * Module selection interface.
- * 
- * @todo
- *   Look into correct PO generation, commented for now.
  */
 function potx_select_form() {
 
@@ -94,7 +93,7 @@ function potx_select_form_validate($form_id, $form) {
 }
 
 /**
- * Generate translation templates for the requested module.
+ * Generate translation template or translation file for the requested module.
  */
 function potx_select_form_submit($form_id, &$form) {
 
