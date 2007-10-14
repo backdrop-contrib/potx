@@ -1,4 +1,5 @@
 ; $Id$
 name = POT extractor
 description = Provides a web interface to extract Gettext templates from the sources of installed modules.
-dependencies = locale
+dependencies[] = locale
+core = 6.x

@@ -14,9 +14,9 @@
 /**
  * Implementation of hook_help().
  */
-function potx_help($section) {
-  switch ($section) {
-    case 'admin/settings/locale/potx':
+function potx_help($path, $arg) {
+  switch ($path) {
+    case 'admin/build/translate/extract':
       return t('This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object Template file is generated (unlike the output of the command line extractor utility), so you can easily save it and start translation.');
   }
 }
@@ -24,19 +24,15 @@ function potx_help($section) {
 /**
  * Implementation of hook_menu().
  */
-function potx_menu($may_cache) {
-  $items = array();
-  if ($may_cache) {
-    $items[] = array(
-      'path' => 'admin/settings/locale/potx',
-      'title' => t('Extract strings'),
-      'callback' => 'drupal_get_form',
-      'callback arguments' => array('potx_select_form'),
-      'access' => user_access('administer locales'),
-      'weight' => 20,
-      'type' => MENU_LOCAL_TASK,
-    );
-  }
+function potx_menu() {
+  $items['admin/build/translate/extract'] = array(
+    'title' => 'Extract',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('potx_select_form'),
+    'access arguments' => array('administer locales'),
+    'weight' => 200,
+    'type' => MENU_LOCAL_TASK,
+  );
   return $items;
 }
 
@@ -48,23 +44,23 @@ function potx_select_form() {
   $form = array();
   $modules = _potx_module_list();
   _potx_build_module_form($form, $modules);
-
+  
   // Generate translation file for a specific language if possible.
-  $supported = locale_supported_languages();
-  $names = $supported['name'];
-  if (count($names) > 1) {
+  $languages = language_list();
+  if (count($languages) > 1 || !isset($languages['en'])) {
+    // We have more languages, or the single language we have is not English.
     $options = array('n/a' => t('Language independent template'));
-    foreach ($names as $langcode => $name) {
+    foreach ($languages as $langcode => $language) {
       // Skip English, as we should not have translations for this language.
       if ($langcode == 'en') {
         continue;
       }
-      $options[$langcode] = t('Template file for !langname translations', array('!langname' => t($name)));
+      $options[$langcode] = t('Template file for !langname translations', array('!langname' => t($language->name)));
     }
     $form['langcode'] = array(
       '#type' => 'radios',
       '#title' => t('Template language'),
-      '#default_value' => 'pot',
+      '#default_value' => 'n/a',
       '#options' => $options,
       '#description' => t('Export a language idependent or language dependent (plural forms, language team name, etc.) template.'),
     );
@@ -79,15 +75,15 @@ function potx_select_form() {
     '#type' => 'submit',
     '#value' => t('Extract'),
   );
-
+  
   return $form;
 }
 
 /**
  * Validation handler for potx module selection form.
  */
-function potx_select_form_validate($form_id, $form) {
-  if (empty($form['module'])) {
+function potx_select_form_validate($form, &$form_state) {
+  if (empty($form_state['values']['module'])) {
     form_set_error('', t('You should select a module to export.'));
   }
 }
@@ -95,47 +91,50 @@ function potx_select_form_validate($form_id, $form) {
 /**
  * Generate translation template or translation file for the requested module.
  */
-function potx_select_form_submit($form_id, &$form) {
+function potx_select_form_submit($form, &$form_state) {
 
   // This could take some time.
   @set_time_limit(0);
-  include_once drupal_get_path('module', 'potx') . '/potx.inc';
+  include_once drupal_get_path('module', 'potx') .'/potx.inc';
 
   // Silence status messages.
   _potx_status(POTX_STATUS_MESSAGE);
 
-  // $form['module'] either contains a specific module file name
+  // $form_state['values']['module'] either contains a specific module file name
   // with path, or a directory name for a module or a module suite.
   // Examples:
   //   modules/watchdog
   //   sites/all/modules/potx
   //   sites/all/modules/i18n/i18n.module
   
-  $pathinfo = pathinfo($form['module']);
+  $pathinfo = pathinfo($form_state['values']['module']);
   $strip_prefix = 0;
   
   // A specific module file was requested.
-  if ($pathinfo['extension'] == 'module') {
+  if (isset($pathinfo['extension']) && $pathinfo['extension'] == 'module') {
     $filename = basename($pathinfo['basename'], '.module');
-    $files = _potx_explore_dir($pathinfo['dirname'] . '/', $filename);
+    $files = _potx_explore_dir($pathinfo['dirname'] .'/', $filename);
     $strip_prefix = 1 + strlen($pathinfo['dirname']);
     $outputname = $filename;
   }
   // A directory name was requested.
   else {
-    $files = _potx_explore_dir($form['module'] . '/');
-    $strip_prefix = 1 + strlen($form['module']);
+    $files = _potx_explore_dir($form_state['values']['module'] .'/');
+    $strip_prefix = 1 + strlen($form_state['values']['module']);
     $outputname = $pathinfo['basename'];
   }
   
   // Decide on template or translation file generation.
   $template_langcode = $translation_langcode = NULL;
-  if (isset($form['langcode']) && ($form['langcode'] != 'n/a')) {
-    $template_langcode = $form['langcode'];
+  if (isset($form_state['values']['langcode']) && ($form_state['values']['langcode'] != 'n/a')) {
+    $template_langcode = $form_state['values']['langcode'];
     $outputname .= '.'. $template_langcode;
-    if (isset($form['translations'])) {
+    if (!empty($form_state['values']['translations'])) {
       $translation_langcode = $template_langcode;
       $outputname .= '.po';
+    }
+    else {
+      $outputname .= '.pot';
     }
   }
   else {
@@ -176,7 +175,7 @@ function _potx_build_module_form(&$form, &$modules, $dirname = '') {
   $dirkeys = array_keys($modules);
   
   // A directory with one module.
-  if ($modules_in_dir && (count($modules) == 1)) { 
+  if (isset($modules_in_dir) && (count($modules) == 1)) { 
     $module_dir = dirname($modules[$dirkeys[0]]->filename);
     $form[_potx_form_id('dir', $module_dir)] = array(
       '#type' => 'radio',
@@ -193,7 +192,7 @@ function _potx_build_module_form(&$form, &$modules, $dirname = '') {
   // A directory with multiple modules in it.
   if (preg_match('!/modules\\b(/.+)?!', $dirname, $pathmatch)) {
     $subst = array('@dir_name' => substr($dirname, 1));
-    if ($pathmatch[1]) {
+    if (isset($pathmatch[1])) {
       $form[_potx_form_id('dir', $dirname)] = array(
         '#type' => 'radio',
         '#title' => t('Extract from all modules in directory "@dir_name"', $subst),
@@ -222,7 +221,7 @@ function _potx_build_module_form(&$form, &$modules, $dirname = '') {
       $subst = array(
         '%module_dir' => dirname($modules[$entry]->filename),
         '%module_name' => basename($modules[$entry]->basename, '.module'),
-        '%module_pattern' => basename($modules[$entry]->basename, '.module'). '.*',
+        '%module_pattern' => basename($modules[$entry]->basename, '.module') .'.*',
       );
       $element[_potx_form_id('mod', $modules[$entry]->basename)] = array(
         '#type' => 'radio',
@@ -254,7 +253,7 @@ function _potx_build_module_form(&$form, &$modules, $dirname = '') {
  *   The generated ID.
  */
 function _potx_form_id($type, $path) {
-  return "potx-$type-" . preg_replace('/[^a-zA-Z0-9]+/', '-', $path);
+  return 'potx-'. $type .'-'. preg_replace('/[^a-zA-Z0-9]+/', '-', $path);
 }
 
 /**
@@ -284,9 +283,9 @@ function _potx_module_list() {
     }
 
     // Information about modules in this directory.
-    $dir['#'.$file->basename] = $file;
+    $dir['#'. $file->basename] = $file;
     $dir['.modulecount'] = isset($dir['.modulecount']) ? $dir['.modulecount'] + 1 : 1;
   }
-
+  
   return $modules;
 }

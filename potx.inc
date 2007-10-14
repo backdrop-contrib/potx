@@ -300,8 +300,8 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
   
   if (!isset($plural)) {
     // Single string to look translation up for.
-    if ($translation = db_result(db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.locale = '%s'", $string, $translation_export_langcode))) {
-      return 'msgstr '. _locale_export_print($translation);
+    if ($translation = db_result(db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.language = '%s'", $string, $translation_export_langcode))) {
+      return 'msgstr '. _locale_export_string($translation);
     }
     return "msgstr \"\"\n";
   }
@@ -309,7 +309,7 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
   else {
     // String with plural variants. Fill up source string array first.
     $strings = array();
-    $number_of_plurals = db_result(db_query("SELECT plurals FROM {locales_meta} WHERE locale = '%s'", $translation_export_langcode));
+    $number_of_plurals = db_result(db_query("SELECT plurals FROM {languages} WHERE language = '%s'", $translation_export_langcode));
     $plural_index = 0;
     while ($plural_index < $number_of_plurals) {
       if ($plural_index == 0) {
@@ -332,8 +332,8 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
     if (count($strings)) {
       // Source string array was done, so export translations.
       foreach ($strings as $index => $string) {
-        if ($translation = db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.locale = '%s'", $string, $translation_export_langcode)) {
-          $output .= 'msgstr['. $index .'] '. _locale_export_print(_locale_export_remove_plural($translation->translation));
+        if ($translation = db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.language = '%s'", $string, $translation_export_langcode)) {
+          $output .= 'msgstr['. $index .'] '. _locale_export_string(_locale_export_remove_plural($translation->translation));
         }
         else {
           $output .= "msgstr[". $index ." \"\"\n";
@@ -362,7 +362,7 @@ function _potx_get_header($file, $template_export_langcode = NULL) {
   // We only have language to use if we should export with that langcode.
   $language = NULL;
   if (isset($template_export_langcode)) {
-    $language = db_fetch_object(db_query("SELECT locale, name, plurals, formula FROM {locales_meta} WHERE locale = '%s'", $template_export_langcode));
+    $language = db_fetch_object(db_query("SELECT language, name, plurals, formula FROM {languages} WHERE language = '%s'", $template_export_langcode));
   }
 
   $output  = '# $'.'Id'.'$'."\n";
@@ -375,8 +375,8 @@ function _potx_get_header($file, $template_export_langcode = NULL) {
   $output .= "msgid \"\"\n";
   $output .= "msgstr \"\"\n";
   $output .= "\"Project-Id-Version: PROJECT VERSION\\n\"\n";
-  $output .= "\"POT-Creation-Date: ". date("Y-m-d H:iO") . "\\n\"\n";
-  $output .= "\"PO-Revision-Date: ". (isset($language) ? date("Y-m-d H:iO") : 'YYYY-mm-DD HH:MM+ZZZZ') ."\\n\"\n";
+  $output .= '"POT-Creation-Date: '. date("Y-m-d H:iO") ."\\n\"\n";
+  $output .= '"PO-Revision-Date: '. (isset($language) ? date("Y-m-d H:iO") : 'YYYY-mm-DD HH:MM+ZZZZ') ."\\n\"\n";
   $output .= "\"Last-Translator: NAME <EMAIL@ADDRESS>\\n\"\n";
   $output .= "\"Language-Team: ". (isset($language) ? $language->name : 'LANGUAGE') ." <EMAIL@ADDRESS>\\n\"\n";
   $output .= "\"MIME-Version: 1.0\\n\"\n";
@@ -785,15 +785,15 @@ function _potx_find_node_types_hook($file, $filebase, $save_callback) {
 function _potx_find_language_names($file, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
 
-  foreach ($_potx_lookup['_locale_get_iso639_list'] as $ti) {
-    // Search for the definition of _locale_get_iso639_list(), not where it is called.
+  foreach ($_potx_lookup['_locale_get_predefined_list'] as $ti) {
+    // Search for the definition of _locale_get_predefined_list(), not where it is called.
     if ($_potx_tokens[$ti-1][0] == T_FUNCTION) {
       break;
     }
   }
     
   $end = _potx_find_end_of_function($ti);
-  $ti += 7; // _locale_get_iso639_list, (, ), {, return, array, (
+  $ti += 7; // _locale_get_predefined_list, (, ), {, return, array, (
   while ($ti < $end) {
     while ($_potx_tokens[$ti][0] != T_ARRAY) {
       if (!is_array($_potx_tokens[$ti]) && $_potx_tokens[$ti] == ';') {
@@ -821,7 +821,7 @@ function _potx_find_language_names($file, $save_callback) {
  */
 function _potx_find_version_number($code, $file, $version_callback) {
   // Prevent CVS from replacing this pattern with actual info.
-  if (preg_match('!\\$I' . 'd: ([^\\$]+) Exp \\$!', $code, $version_info)) {
+  if (preg_match('!\\$I'.'d: ([^\\$]+) Exp \\$!', $code, $version_info)) {
     $version_callback($version_info[1], $file);
   }
 }
@@ -870,7 +870,7 @@ function _potx_add_format_interval_strings($file, $save_callback) {
     '1 min'  => '@count min',
     '1 sec'  => '@count sec');
 
-  foreach($components as $singular => $plural) {
+  foreach ($components as $singular => $plural) {
     $save_callback($singular ."\0". $plural, $file);
   }
 }
