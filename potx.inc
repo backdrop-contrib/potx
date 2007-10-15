@@ -91,7 +91,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 
   // Figure out the basename and extension to select extraction method.
   $basename = basename($file_path);
-  list($filebase, $fileext) = explode(".", $basename, 2);
+  $name_parts = pathinfo($basename);
 
   // Always grab the CVS version number from the code
   $code = file_get_contents($file_path);
@@ -99,9 +99,12 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   _potx_find_version_number($code, $file_name, $version_callback);
 
   // The .info files are not PHP code, no need to tokenize.
-  if ($fileext == 'info') {
+  if ($name_parts['extension'] == 'info') {
     _potx_find_info_file_strings($file_path, $file_name, $save_callback);
     return;
+  }
+  elseif ($name_parts['extension'] == 'js') {
+    _potx_parse_js_file($code, $file_name, $save_callback);
   }
 
   // Extract raw PHP language tokens.
@@ -145,25 +148,23 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   _potx_find_t_calls($file_name, $save_callback, '$t', POTX_STRING_BOTH);
   _potx_find_t_calls($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
 
-  // Watchdog calls have their first argument translated in Drupal 5.x.
-  // TODO: need to update this for Drupal 6.x
-  _potx_find_t_calls($file_name, $save_callback, 'watchdog');
+  // Watchdog calls have both of their arguments translated in Drupal 6.x.
+  _potx_find_watchdog_calls($file_name, $save_callback);
 
   // Plurals need unique parsing.
   _potx_find_format_plural_calls($file_name, $save_callback);
 
-  if ($fileext == 'module') {
-    _potx_find_perm_hook($file_name, $filebase, $save_callback);
-    // TODO: this is required for Drupal 6.x.
-    // _potx_find_menu_hook($file, $filebase, $save_callback);
-    _potx_find_node_types_hook($file_name, $filebase, $save_callback);
-    // Add the module name.
-    $save_callback($filebase, $file_name);
+  if ($name_parts['extension'] == 'module') {
+    _potx_find_perm_hook($file_name, $name_parts['filename'], $save_callback);
+    _potx_find_menu_hook($file_name, $name_parts['filename'], $save_callback);
+    _potx_find_node_types_hook($file_name, $name_parts['filename'], $save_callback);
+    // Add the machine readable module name.
+    $save_callback($name_parts['filename'], $file_name);
   }
   
-  if ($fileext == 'theme') {
+  if ($name_parts['extension'] == 'theme') {
     // Add the theme name.
-    $save_callback($filebase, $file_name);
+    $save_callback($name_parts['filename'], $file_name);
   }
 
   // Special handling of some Drupal core files.
@@ -476,7 +477,7 @@ function _potx_format_quoted_string($str) {
 }
 
 /**
- * Output a marker error with an extract of where the error was found
+ * Output a marker error with an extract of where the error was found.
  *
  * @param $file
  *   Name of file
@@ -556,8 +557,8 @@ function _potx_status($text, $type = 'status') {
  * @param $save_callback
  *   Callback function used to save strings.
  * @param function_name
- *   The name of the function to look for (could be 't', '$t', 'st',
- *   'watchdog' or any other t-like function).
+ *   The name of the function to look for (could be 't', '$t', 'st'
+ *   or any other t-like function).
  * @param $string_mode
  *   String mode to use: POTX_STRING_INSTALLER, POTX_STRING_RUNTIME or
  *   POTX_STRING_BOTH.
@@ -585,12 +586,49 @@ function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string
 }
 
 /**
+ * Detect all occurances of watchdog() calls.
+ *
+ * These sequences are searched for:
+ *   watchdog + "(" + T_CONSTANT_ENCAPSED_STRING + "," +
+ *   T_CONSTANT_ENCAPSED_STRING + something
+ *
+ * @param $file
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ */
+function _potx_find_watchdog_calls($file, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+  
+  // Lookup tokens by function name.
+  if (isset($_potx_lookup['watchdog'])) {
+    foreach ($_potx_lookup['watchdog'] as $ti) {
+      list($ctok, $par, $mtype, $comma, $message, $rig) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3], $_potx_tokens[$ti+4], $_potx_tokens[$ti+5]);
+      list($type, $string, $line) = $ctok;
+      if ($par == '(') {
+        // Both type and message should be a string literal.
+        if (in_array($rig, array(')', ',')) && $comma == ','
+          && (is_array($mtype) && ($mtype[0] == T_CONSTANT_ENCAPSED_STRING))
+          && (is_array($message) && ($message[0] == T_CONSTANT_ENCAPSED_STRING))) {
+            $save_callback(_potx_format_quoted_string($mtype[1]), $file, $line);
+            $save_callback(_potx_format_quoted_string($message[1]), $file, $line);
+        }
+        else {
+          // watchdog() found, but inside is something which is not a string literal.
+          _potx_marker_error($file, $line, 'watchdog', $ti);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Detect all occurances of format_plural calls.
  *
  * These sequences are searched for:
  *   T_STRING("format_plural") + "(" + ..anything (might be more tokens).. +
  *   "," + T_CONSTANT_ENCAPSED_STRING +
- *   "," + T_CONSTANT_ENCAPSED_STRING + ")"
+ *   "," + T_CONSTANT_ENCAPSED_STRING + parenthesis or comma
  *
  * @param $file
  *   Name of file parsed.
@@ -619,7 +657,7 @@ function _potx_find_format_plural_calls($file, $save_callback) {
         }
         // Get further parameters
         list($comma1, $singular, $comma2, $plural, $par2) = array($_potx_tokens[$tn], $_potx_tokens[$tn+1], $_potx_tokens[$tn+2], $_potx_tokens[$tn+3], $_potx_tokens[$tn+4]);
-        if (($comma2 == ",") && ($par2 == ")") &&
+        if (($comma2 == ',') && ($par2 == ')' || $par2 == ',') &&
           (is_array($singular) && ($singular[0] == T_CONSTANT_ENCAPSED_STRING)) &&
           (is_array($plural) && ($plural[0] == T_CONSTANT_ENCAPSED_STRING))) {
             $save_callback(
@@ -715,34 +753,34 @@ function _potx_find_end_of_function($here) {
  * @param $save_callback
  *   Callback function used to save strings.
  */
-/*function _potx_find_menu_hook($file, $filebase, $save_callback) {
+function _potx_find_menu_hook($file, $filebase, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
   
   if (is_array($_potx_lookup[$filebase .'_menu'])) {
+    // We have a menu hook in this file.
     foreach ($_potx_lookup[$filebase .'_menu'] as $ti) {
       $end = _potx_find_end_of_function($ti);
       $tn = $ti;
       while ($tn < $end) {
-        if ($_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
-          // TODO: also look up descriptions, this only searches for titles
-          if ($_potx_tokens[$tn][1] == "'title'" || $_potx_tokens[$tn][1] == '"title"') {
-            if ($_potx_tokens[$tn+1][0] == T_DOUBLE_ARROW) {
-              if ($_potx_tokens[$tn+2][0] == T_CONSTANT_ENCAPSED_STRING) {
-                $save_callback(
-                  _potx_format_quoted_string($_potx_tokens[$tn+2][1]),
-                  $file,
-                  $_potx_tokens[$tn+2][2]
-                );
-                $tn+=2; // Jump forward by 2.
-              }
-            }
+        // Look through the code until the end of the function.
+        if ($_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING && in_array($_potx_tokens[$tn][1], array("'title'", '"title"', "'description'", '"description"')) && $_potx_tokens[$tn+1][0] == T_DOUBLE_ARROW) {
+          if ($_potx_tokens[$tn+2][0] == T_CONSTANT_ENCAPSED_STRING) {
+            $save_callback(
+              _potx_format_quoted_string($_potx_tokens[$tn+2][1]),
+              $file,
+              $_potx_tokens[$tn+2][2]
+            );
+            $tn+=2; // Jump forward by 2.
+          }
+          else {
+            _potx_status(t("Invalid menu %element definition found in %hook in %filename on line %lineno\n\n", array('%element' => $_potx_tokens[$tn][1], '%filename' => $file, '%hook' => $filebase .'_menu()', '%lineno' => $_potx_tokens[$tn][2])), 'error');
           }
         }
         $tn++;
       }
     }
   }
-}*/
+}
 
 /**
  * Detect oldschool node type names from hook_node_types().
@@ -888,10 +926,8 @@ function _potx_add_format_interval_strings($file, $save_callback) {
 function _potx_find_info_file_strings($file_path, $file_name, $save_callback) {
   $info = array();
 
-  // TODO: update this for Drupal 6.x, where parse_ini_file
-  // is not applicable anymore
   if (file_exists($file_path)) {
-    $info = parse_ini_file($file_path);
+    $info = drupal_parse_info_file($file_path);
   }
 
   // We need the name, description and package values. Others,
@@ -902,6 +938,61 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback) {
       $save_callback($info[$key], $file_name);
     }
   }
+}
+
+/**
+ * Parses a JavaScript file for translatables.
+ *
+ * Extracts strings wrapped in Drupal.t() and Drupal.formatPlural()
+ * calls and inserts them into potx storage.
+ *
+ * Regex code lifted from _locale_parse_js_file().
+ */
+function _potx_parse_js_file($code, $file, $save_callback) {
+  $js_string_regex = '(?:(?:\'(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+';
+  
+  // Match all calls to Drupal.t() in an array.
+  // Note: \s also matches newlines with the 's' modifier.
+  preg_match_all('~[^\w]Drupal\s*\.\s*t\s*\(\s*('. $js_string_regex .')\s*[,\)]~s', $code, $t_matches, PREG_SET_ORDER);
+  if (isset($t_matches) && count($t_matches)) {
+    foreach($t_matches as $match) {
+      // Remove match from code to help us identify faulty Drupal.t() calls.
+      $code = str_replace($match[0], '', $code);
+      $save_callback(_potx_parse_js_string($match[1]), $file, 0);
+    }
+  }
+
+  // Match all Drupal.formatPlural() calls in another array.
+  preg_match_all('~[^\w]Drupal\s*\.\s*formatPlural\s*\(\s*.+?\s*,\s*('. $js_string_regex .')\s*,\s*((?:(?:\'(?:\\\\\'|[^\'])*@count(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*@count(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+)\s*[,\)]~s', $code, $plural_matches, PREG_SET_ORDER);
+  if (isset($plural_matches) && count($plural_matches)) {
+    foreach($plural_matches as $index => $match) {
+      // Remove match from code to help us identify faulty
+      // Drupal.formatPlural() calls later.
+      $code = str_replace($match[0], '', $code);
+      $save_callback(
+        _potx_parse_js_string($match[1]) ."\0". _potx_parse_js_string($match[2]),
+        $file,
+        0
+      );
+    }
+  }
+  
+  // Any remaining Drupal.t() or Drupal.formatPlural() calls are evil. This
+  // regex is not terribly accurate (ie. code wrapped inside will confuse
+  // the match), but we only need some unique part to identify the faulty calls.
+  preg_match_all('~[^\w]Drupal\s*\.\s*(t|formatPlural)\s*\([^)]+\)~s', $code, $faulty_matches, PREG_SET_ORDER);
+  if (isset($faulty_matches) && count($faulty_matches)) {
+    foreach($faulty_matches as $index => $match) {
+      _potx_status(t("Invalid marker content in %filename\n* %marker\n\n", array('%filename' => $file, '%marker' => $match[0])), 'error');
+    }
+  }
+}
+
+/**
+ * Clean up string found in JavaScript source code.
+ */
+function _potx_parse_js_string($string) {
+  return _potx_format_quoted_string(implode('', preg_split('~(?<!\\\\)[\'"]\s*\+\s*[\'"]~s', $string)));
 }
 
 /**
@@ -918,7 +1009,7 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback) {
  *   Add folder exceptions for other version control systems.
  */
 function _potx_explore_dir($path = '', $basename = '*') {
-  $files = glob("$path$basename.{php,inc,module,engine,theme,install,info,profile}", GLOB_BRACE);
+  $files = glob("$path$basename.{php,inc,module,engine,theme,install,info,profile,js}", GLOB_BRACE);
   $dirs = glob("$path*", GLOB_ONLYDIR);
   foreach ($dirs as $dir) {
     if (!preg_match("!(^|.+/)(CVS|.svn|.git)$!", $dir)) {
