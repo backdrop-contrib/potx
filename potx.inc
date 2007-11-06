@@ -237,11 +237,19 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
   foreach ($strings as $string => $file_info) {
     // Build a compact list of files this string occured in.
     $occured = $file_list = array();
+    // Look for strings appearing in multiple directories (ie.
+    // different subprojects). So we can include them in general.pot.
+    $last_location = dirname(array_shift(array_keys($file_info)));
+    $multiple_locations = FALSE;
     foreach ($file_info as $file => $lines) {
       $occured[] = "$file:". join(';', $lines);
       if (isset($versions[$file])) {
         $file_list[] = $versions[$file];
       }
+      if (dirname($file) != $last_location) {
+        $multiple_locations = TRUE;
+      }
+      $last_location = dirname($file);
     }
 
     // Mark duplicate strings (both translated in the app and in the installer).
@@ -251,19 +259,29 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
     }
     $output = "#: $comment\n";
 
-    // File name forcing in single mode.
     if ($build_mode == POTX_BUILD_SINGLE) {
+      // File name forcing in single mode.
       $file_name = $force_name;
     }
-    // Store .info file strings either in general.pot or the module pot file,
-    // depending on the mode used.
     elseif (strpos($comment, '.info')) {
+      // Store .info file strings either in general.pot or the module pot file,
+      // depending on the mode used.
       $file_name = ($build_mode == POTX_BUILD_CORE ? 'general' : str_replace('.info', '.module', $file_name));
     }
-    // Else if occured more than once, store in general.pot.
-    else {
-      $file_name = (count($occured) > 1 ? 'general' : $file);
+    elseif ($multiple_locations) {
+      // Else if occured more than once, store in general.pot.
+      $file_name = 'general';
     }
+    else {
+      // Fold multiple files in the same folder into one.
+      if (empty($last_location) || $last_location == '.') {
+        $file_name = 'root';
+      }
+      else {
+        $file_name = str_replace('/', '-', $last_location);
+      }
+    }
+    
 
     if (strpos($string, "\0") !== FALSE) {
       // Plural strings have a null byte delimited format.
@@ -436,24 +454,6 @@ function _potx_get_header($file, $template_export_langcode = NULL, $api_version 
  */
 function _potx_write_files($http_filename = NULL, $content_disposition = 'inline') {
   global $_potx_store;
-  
-  // Possibly merge some files if we have more then one.
-  if (count($_potx_store) > 1) {
-    foreach ($_potx_store as $file => $contents) {
-      // Merge too small files into general.pot.
-      if ($contents['count'] < 10 && $file != 'general') {
-        if (!isset($_potx_store['general'])) {
-          $_potx_store['general'] = $contents;
-        }
-        else {
-          $_potx_store['general']['sources']  = array_unique(array_merge($_potx_store['general']['sources'], $contents['sources']));
-          $_potx_store['general']['strings'] .= $contents['strings'];
-        }
-        // Drop this file, contents are integrated into general.pot.
-        unset($_potx_store[$file]);
-      }
-    }
-  }
 
   // Generate file lists and output files.
   foreach ($_potx_store as $file => $contents) {
