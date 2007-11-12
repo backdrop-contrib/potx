@@ -17,7 +17,7 @@
 function potx_help($path, $arg) {
   switch ($path) {
     case 'admin/build/translate/extract':
-      return t('This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object Template file is generated (unlike the output of the command line extractor utility), so you can easily save it and start translation.');
+      return t('This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object (Template) file is generated, so you can easily save it and start translation.');
   }
 }
 
@@ -62,7 +62,7 @@ function potx_select_form() {
       '#title' => t('Template language'),
       '#default_value' => 'n/a',
       '#options' => $options,
-      '#description' => t('Export a language idependent or language dependent (plural forms, language team name, etc.) template.'),
+      '#description' => t('Export a language independent or language dependent (plural forms, language team name, etc.) template.'),
     );
     $form['translations'] = array(
       '#type' => 'checkbox',
