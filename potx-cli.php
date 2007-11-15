@@ -87,14 +87,14 @@ if (empty($files)) {
 }
 
 foreach ($files as $file) {
-  _potx_status("Processing $file...\n");
+  potx_status('status', "Processing $file...\n");
   _potx_process_file($file);
 }
 
 _potx_build_files(POTX_STRING_RUNTIME, $build_mode);
 _potx_build_files(POTX_STRING_INSTALLER, POTX_BUILD_SINGLE, 'installer');
 _potx_write_files();
-_potx_status("\nDone.\n");
+potx_status('status', "\nDone.\n");
 
 return;
 

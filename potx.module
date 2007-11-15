@@ -17,7 +17,7 @@
 function potx_help($path, $arg) {
   switch ($path) {
     case 'admin/build/translate/extract':
-      return t('This page allows you to generate translation templates for module files. Select the module you wish to generate a template file for. A single Gettext Portable Object (Template) file is generated, so you can easily save it and start translation.');
+      return t('This page allows you to generate translation templates for module and theme files. Select the module or theme you wish to generate a template file for. A single Gettext Portable Object (Template) file is generated, so you can easily save it and start translation.');
   }
 }
 
@@ -37,13 +37,13 @@ function potx_menu() {
 }
 
 /**
- * Module selection interface.
+ * Component selection interface.
  */
 function potx_select_form() {
 
   $form = array();
-  $modules = _potx_module_list();
-  _potx_build_module_form($form, $modules);
+  $components = _potx_component_list();
+  _potx_component_selector($form, $components);
   
   // Generate translation file for a specific language if possible.
   $languages = language_list();
@@ -80,16 +80,16 @@ function potx_select_form() {
 }
 
 /**
- * Validation handler for potx module selection form.
+ * Validation handler for potx component selection form.
  */
 function potx_select_form_validate($form, &$form_state) {
-  if (empty($form_state['values']['module'])) {
-    form_set_error('', t('You should select a module to export.'));
+  if (empty($form_state['values']['component'])) {
+    form_set_error('', t('You should select a component to export.'));
   }
 }
 
 /**
- * Generate translation template or translation file for the requested module.
+ * Generate translation template or translation file for the requested component.
  */
 function potx_select_form_submit($form, &$form_state) {
 
@@ -98,29 +98,31 @@ function potx_select_form_submit($form, &$form_state) {
   include_once drupal_get_path('module', 'potx') .'/potx.inc';
 
   // Silence status messages.
-  _potx_status(POTX_STATUS_MESSAGE);
+  potx_status('set', POTX_STATUS_MESSAGE);
 
-  // $form_state['values']['module'] either contains a specific module file name
-  // with path, or a directory name for a module or a module suite.
+  // $form_state['values']['component'] either contains a specific file name
+  // with path, or a directory name for a module/theme or a module suite.
   // Examples:
   //   modules/watchdog
-  //   sites/all/modules/potx
+  //   sites/all/modules/coder
   //   sites/all/modules/i18n/i18n.module
+  //   themes/garland
   
-  $pathinfo = pathinfo($form_state['values']['module']);
+  $component = $form_state['values']['component'];
+  $pathinfo = pathinfo($component);
   $strip_prefix = 0;
-  
-  // A specific module file was requested.
-  if (isset($pathinfo['extension']) && $pathinfo['extension'] == 'module') {
-    $filename = basename($pathinfo['basename'], '.module');
+
+  if (isset($pathinfo['extension'])) {
+    // A specific module or theme file was requested (otherwise there should be no extension). 
+    $filename = preg_replace('!^(.+)'. preg_quote($pathinfo['extension'], '!') .'$!', '\1', $pathinfo['basename']);
     $files = _potx_explore_dir($pathinfo['dirname'] .'/', $filename);
     $strip_prefix = 1 + strlen($pathinfo['dirname']);
     $outputname = $filename;
   }
   // A directory name was requested.
   else {
-    $files = _potx_explore_dir($form_state['values']['module'] .'/');
-    $strip_prefix = 1 + strlen($form_state['values']['module']);
+    $files = _potx_explore_dir($component .'/');
+    $strip_prefix = 1 + strlen($component);
     $outputname = $pathinfo['basename'];
   }
   
@@ -154,58 +156,59 @@ function potx_select_form_submit($form, &$form_state) {
 }
 
 /**
- * Build a chunk of the module selection form.
+ * Build a chunk of the component selection form.
  *
  * @param $form
  *   Form to populate with fields.
- * @param $modules
- *   Structured array with modules as returned by _potx_module_list().
+ * @param $components
+ *   Structured array with components as returned by _potx_component_list().
  * @param $dirname
  *   Name of directory handled.
  */
-function _potx_build_module_form(&$form, &$modules, $dirname = '') {
+function _potx_component_selector(&$form, &$components, $dirname = '') {
 
-  // Pop off count of modules in this directory.
-  if (isset($modules['.modulecount'])) {
-    $modules_in_dir = $modules['.modulecount'];
-    unset($modules['.modulecount']);
+  // Pop off count of components in this directory.
+  if (isset($components['#-count'])) {
+    $component_count = $components['#-count'];
+    unset($components['#-count']);
   }
 
-  ksort($modules);
-  $dirkeys = array_keys($modules);
+  //ksort($components);
+  $dirkeys = array_keys($components);
   
-  // A directory with one module.
-  if (isset($modules_in_dir) && (count($modules) == 1)) { 
-    $module_dir = dirname($modules[$dirkeys[0]]->filename);
-    $form[_potx_form_id('dir', $module_dir)] = array(
+  // A directory with one component.
+  if (isset($component_count) && (count($components) == 1)) { 
+    $component = array_shift($components);
+    $dirname = dirname($component->filename);
+    $form[_potx_form_id('dir', $dirname)] = array(
       '#type' => 'radio',
-      '#title' => t('Extract from %module_name module, in directory %dir_name', array('%dir_name' => $module_dir, '%module_name' => basename($modules[$dirkeys[0]]->basename, '.module'))),
+      '#title' => t('Extract from %name in the %directory directory', array('%directory' => $dirname, '%name' => $component->name)),
       '#description' => t('Generates output from all files found in this directory.'),
       '#default_value' => 0,
-      '#return_value' => $module_dir,
+      '#return_value' => $dirname,
       // Get all radio buttons into the same group.
-      '#parents' => array('module'),
+      '#parents' => array('component'),
     );
     return;
   }
 
-  // A directory with multiple modules in it.
-  if (preg_match('!/modules\\b(/.+)?!', $dirname, $pathmatch)) {
-    $subst = array('@dir_name' => substr($dirname, 1));
-    if (isset($pathmatch[1])) {
+  // A directory with multiple components in it.
+  if (preg_match('!/(modules|themes)\\b(/.+)?!', $dirname, $pathmatch)) {
+    $t_args = array('@directory' => substr($dirname, 1));
+    if (isset($pathmatch[2])) {
       $form[_potx_form_id('dir', $dirname)] = array(
         '#type' => 'radio',
-        '#title' => t('Extract from all modules in directory "@dir_name"', $subst),
-        '#description' => t('To extract from a single module in this directory, choose the module entry in the fieldset below.'),
+        '#title' => t('Extract from all in directory "@directory"', $t_args),
+        '#description' => t('To extract from a single component in this directory, choose the desired entry in the fieldset below.'),
         '#default_value' => 0,
         '#return_value' => substr($dirname, 1),
         // Get all radio buttons into the same group.
-        '#parents' => array('module'),
+        '#parents' => array('component'),
       );
     }
     $element = array(
       '#type' => 'fieldset',
-      '#title' => t('Modules in "@dir_name"', $subst),
+      '#title' => t('Directory "@directory"', $t_args),
       '#collapsible' => true,
       '#collapsed' => true,
     );
@@ -216,37 +219,38 @@ function _potx_build_module_form(&$form, &$modules, $dirname = '') {
   }
 
   foreach ($dirkeys as $entry) {
-    // A module in this directory with multiple modules.
+    // A component in this directory with multiple components.
     if ($entry[0] == '#') {
-      $subst = array(
-        '%module_dir' => dirname($modules[$entry]->filename),
-        '%module_name' => basename($modules[$entry]->basename, '.module'),
-        '%module_pattern' => basename($modules[$entry]->basename, '.module') .'.*',
+      // Component entry.
+      $t_args = array(
+        '%directory' => dirname($components[$entry]->filename),
+        '%name'      => $components[$entry]->name,
+        '%pattern'   => $components[$entry]->name .'.*',
       );
-      $element[_potx_form_id('mod', $modules[$entry]->basename)] = array(
+      $element[_potx_form_id('com', $components[$entry]->basename)] = array(
         '#type' => 'radio',
-        '#title' => t('Extract from module %module_name', $subst),
-        '#description' => t('Extract from files named %module_pattern, in directory %module_dir.', $subst),
+        '#title' => t('Extract from %name', $t_args),
+        '#description' => t('Extract from files named %pattern in the %directory directory.', $t_args),
         '#default_value' => 0,
-        '#return_value' => $modules[$entry]->filename,
+        '#return_value' => $components[$entry]->filename,
         // Get all radio buttons into the same group.
-        '#parents' => array('module'),
+        '#parents' => array('component'),
       );
     }
     // A subdirectory we need to look into.
     else {
-      _potx_build_module_form($element, $modules[$entry], "$dirname/$entry");
+      _potx_component_selector($element, $components[$entry], "$dirname/$entry");
     }
   }
 
-  return count($modules);
+  return count($components);
 }
 
 /**
  * Generate a sane form element ID for the current radio button.
  *
  * @param $type
- *   Type of ID generated: 'fs' for fieldset, 'dir' for directory, 'mod' for module
+ *   Type of ID generated: 'fs' for fieldset, 'dir' for directory, 'com' for component.
  * @param $path
  *   Path of file we generate an ID for.
  * @return
@@ -257,24 +261,22 @@ function _potx_form_id($type, $path) {
 }
 
 /**
- * Generate a hierarchical structured list of modules.
+ * Generate a hierarchical structured list of components.
+ *
+ * @return
+ *  Array in the directory structure identified.
+ *    - 'normal'  keyed elements being subfolders
+ *    - '#name'   elements being component objects for the 'name' component
+ *    - '#-count' being the file count of all components in the directory
  */
-function _potx_module_list() {
-  // Get current list of enabled modules and their file names.
-  $files = drupal_system_listing('\.module$', 'modules', 'name', 0);
-  system_get_files_database($files, 'module');
-  ksort($files);
-
-  $modules = array();
-  foreach ($files as $file) {
-    // Skip disabled modules
-    if ($file->status != 1) {
-      continue;
-    }
-    
+function _potx_component_list() {
+  $components = array();
+  // Get a list of all enabled modules and themes.
+  $result = db_query("SELECT name, filename, type, status FROM {system} WHERE type IN ('module', 'theme') AND status = 1 ORDER BY filename ASC");
+  while ($component = db_fetch_object($result)) {
     // Build directory tree structure.
-    $path_parts = explode('/', dirname($file->filename));
-    $dir =& $modules;
+    $path_parts = explode('/', dirname($component->filename));
+    $dir =& $components;
     foreach ($path_parts as $dirname) {
       if (!isset($dir[$dirname])) {
         $dir[$dirname] = array();
@@ -282,10 +284,49 @@ function _potx_module_list() {
       $dir =& $dir[$dirname];
     }
 
-    // Information about modules in this directory.
-    $dir['#'. $file->basename] = $file;
-    $dir['.modulecount'] = isset($dir['.modulecount']) ? $dir['.modulecount'] + 1 : 1;
+    // Information about components in this directory.
+    $component->basename = basename($component->filename);
+    $dir['#'. $component->basename] = $component;
+    $dir['#-count'] = isset($dir['#-count']) ? $dir['#-count'] + 1 : 1;
   }
   
-  return $modules;
+  return $components;
+}
+
+/**
+ * Implementation of hook_reviews(). Coder module integration.
+ *
+ * Provides the list of reviews provided by this module.
+ */
+function potx_reviews() {
+  $review = array(
+    '#title' => t('Interface text translatability'),
+    '#link' => 'http://drupal.org/translators',
+    '#rules' => array(
+      array(
+        '#type' => 'callback',
+        '#value' => 'potx_coder_review',
+      ),
+    )
+  );
+  return array('potx' => $review);
+}
+
+/**
+ * Callback implementation for coder review of one file.
+ */
+function potx_coder_review(&$coder_args, $review, $rule, $lines, &$results) {
+  include_once drupal_get_path('module', 'potx') .'/potx.inc';
+
+  // Request collection of error messages internally.
+  potx_status('set', POTX_STATUS_SILENT);
+  // Process the file (but throw away the result);
+  _potx_process_file(realpath($coder_args['#filename']));
+  // Grab the errors and empty the error list.
+  $errors = potx_status('get', TRUE);
+  
+  $severity_name = _coder_severity_name($coder_args, $review, $rule);
+  foreach ($errors as $error) {
+    $results[] = theme('coder_warning', array('#warning' => $error), $severity_name, 0, '');
+  }
 }

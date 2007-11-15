@@ -177,7 +177,6 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     if ($api_version == POTX_API_6) {  
       _potx_find_menu_hook($file_name, $name_parts['filename'], $save_callback);
     }  
-    _potx_find_node_types_hook($file_name, $name_parts['filename'], $save_callback);
     // Add the machine readable module name.
     $save_callback($name_parts['filename'], $file_name);
   }
@@ -540,38 +539,57 @@ function _potx_marker_error($file, $line, $marker, $ti) {
     }
     $ti++;
   }
-  _potx_status(t("Invalid marker content in %filename:%lineno\n* %marker(%tokens\n\n", array('%filename' => $file, '%lineno' => $line, '%marker' => $marker, '%tokens' => $tokens)), 'error');
+  potx_status('error', t("Invalid marker content in %filename:%lineno\n* %marker(%tokens\n\n", array('%filename' => $file, '%lineno' => $line, '%marker' => $marker, '%tokens' => $tokens)));
 }
 
 /**
  * Status notification function.
  *
- * @param $text
- *   Text of status message, or POTX_STATUS_* constant
- *   to set status reporting mode.
- * @param $type
- *   Type of message: 'status' or 'error'.
+ * @param $op
+ *   Operation to perform or type of message text.
+ *     - set:    sets the reporting mode to $value
+ *               use the POTX_STATUS_* constants as $values
+ *     - get:    returns the list of error messages recorded
+ *     - error:  sends an error message in $value
+ *     - status: sends a status message in $value
+ * @param $value
+ *   Value depending on $op, unused with the 'get' op.
  */
-function _potx_status($text, $type = 'status') {
-  static $reporting = POTX_STATUS_CLI;
+function potx_status($op, $value) {
+  static $mode = POTX_STATUS_CLI;
+  static $messages = array();
   
-  // Modify reporting type, if given.
-  if (!is_string($text)) {
-    $reporting = $text;
-    return;
-  }
-  else {
-    switch ($reporting) {
-      case POTX_STATUS_MESSAGE:
-        drupal_set_message($text, $type);
-        break;
-      case POTX_STATUS_CLI:
-        fwrite($type == 'error' ? STDERR : STDOUT, $text);
-        break;
-      case POTX_STATUS_SILENT:
-        // Do nothing.
-        break;
-    }
+  switch($op) {
+    case 'set':
+      // Setting the reporting mode.
+      $mode = $value;
+      return;
+
+    case 'get':
+      // Getting the errors. Optionally deleting the messages.
+      $errors = $messages;
+      if ($value) {
+        $messages = array();
+      }
+      return $errors;
+
+    case 'error':
+    case 'status':
+      // Error message or progress text to display.
+      switch ($mode) {
+        case POTX_STATUS_MESSAGE:
+          drupal_set_message($value, $op);
+          break;
+        case POTX_STATUS_CLI:
+          fwrite($op == 'error' ? STDERR : STDOUT, $value);
+          break;
+        case POTX_STATUS_SILENT:
+          if ($op == 'error') {
+            $messages[] = $value;
+          }
+          break;
+      }
+      return;
   }
 }
 
@@ -805,37 +823,7 @@ function _potx_find_menu_hook($file, $filebase, $save_callback) {
             $tn+=2; // Jump forward by 2.
           }
           else {
-            _potx_status(t("Invalid menu %element definition found in %hook in %filename on line %lineno\n\n", array('%element' => $_potx_tokens[$tn][1], '%filename' => $file, '%hook' => $filebase .'_menu()', '%lineno' => $_potx_tokens[$tn][2])), 'error');
-          }
-        }
-        $tn++;
-      }
-    }
-  }
-}
-
-/**
- * Detect oldschool node type names from hook_node_types().
- *
- * @param $file
- *   Full path name of file parsed.
- * @param $filebase
- *   Filenaname of file parsed.
- * @param $save_callback
- *   Callback function used to save strings.
- */
-function _potx_find_node_types_hook($file, $filebase, $save_callback) {
-  global $_potx_tokens, $_potx_lookup;
-
-  if (isset($_potx_lookup[$filebase .'_node_types'])) {
-    foreach ($_potx_lookup[$filebase .'_node_types'] as $ti) {
-      $line = $_potx_tokens[$ti][2]; // We can actually target the line each token is on, but this is enough.
-      $end = _potx_find_end_of_function($ti);
-      $tn = $ti;
-      while ($tn < $end) {
-        if (is_array($_potx_tokens[$tn])) {
-          if ($_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
-            $save_callback(_potx_format_quoted_string($_potx_tokens[$tn][1]), $file, $line);
+            potx_status('error', t("Invalid menu %element definition found in %hook in %filename on line %lineno\n\n", array('%element' => $_potx_tokens[$tn][1], '%filename' => $file, '%hook' => $filebase .'_menu()', '%lineno' => $_potx_tokens[$tn][2])));
           }
         }
         $tn++;
@@ -1021,7 +1009,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   preg_match_all('~[^\w]Drupal\s*\.\s*(t|formatPlural)\s*\([^)]+\)~s', $code, $faulty_matches, PREG_SET_ORDER);
   if (isset($faulty_matches) && count($faulty_matches)) {
     foreach($faulty_matches as $index => $match) {
-      _potx_status(t("Invalid marker content in %filename\n* %marker\n\n", array('%filename' => $file, '%marker' => $match[0])), 'error');
+      potx_status('error', t("Invalid marker content in %filename\n* %marker\n\n", array('%filename' => $file, '%marker' => $match[0])));
     }
   }
 }
