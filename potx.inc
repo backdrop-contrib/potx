@@ -752,14 +752,19 @@ function _potx_find_perm_hook($file, $filebase, $save_callback) {
       }
     }
     else {
+      $count = 0;
       foreach ($_potx_lookup[$filebase .'_perm'] as $ti) {
         $tn = $ti;
         while (is_array($_potx_tokens[$tn]) || $_potx_tokens[$tn] != '}') {
           if (is_array($_potx_tokens[$tn]) && $_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
             $save_callback(_potx_format_quoted_string($_potx_tokens[$tn][1]), $file, $_potx_tokens[$tn][2]);
+            $count++;
           }
           $tn++;
         }
+      }
+      if (!$count) {
+        potx_status('error', t("Found a hook_perm() implementation in %filename, but there were no literally provided permissions to record.\n\n", array('%filename' => $file)));
       }
     }
   }
