@@ -905,7 +905,7 @@ function _potx_find_version_number($code, $file, $version_callback) {
 function _potx_add_date_strings($file, $save_callback, $api_version = POTX_API_6) {
   for ($i = 1; $i <= 12; $i++) {
     $stamp = mktime(0, 0, 0, $i, 1, 1971);
-    $save_callback($api_version == POTX_API_6 ? '!long-month-name ' : ''. date("F", $stamp), $file);
+    $save_callback(($api_version == POTX_API_6 ? '!long-month-name ' : ''). date("F", $stamp), $file);
     $save_callback(date("M", $stamp), $file);
   }
   for ($i = 0; $i <= 7; $i++) {
