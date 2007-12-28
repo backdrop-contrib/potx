@@ -340,6 +340,9 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
 function _potx_translation_export($translation_export_langcode, $string, $plural = NULL, $api_version = POTX_API_6) {
   include_once 'includes/locale.inc';
   
+  // Stip out slash escapes.
+  $string = stripcslashes($string);
+  
   // Column and table name changed between versions.
   $language_column = $api_version == POTX_API_6 ? 'language' : 'locale';
   $language_table  = $api_version == POTX_API_6 ? 'languages' : 'locales_meta';
@@ -354,6 +357,7 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
   
   else {
     // String with plural variants. Fill up source string array first.
+    $plural = stripcslashes($plural);
     $strings = array();
     $number_of_plurals = db_result(db_query('SELECT plurals FROM {'. $language_table ."} WHERE {$language_column} = '%s'", $translation_export_langcode));
     $plural_index = 0;
