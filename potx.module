@@ -29,7 +29,7 @@ function potx_menu() {
     'title' => 'Extract',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('potx_select_form'),
-    'access arguments' => array('administer locales'),
+    'access arguments' => array('translate interface'),
     'weight' => 200,
     'type' => MENU_LOCAL_TASK,
   );
