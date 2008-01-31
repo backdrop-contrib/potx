@@ -900,6 +900,10 @@ function _potx_find_version_number($code, $file, $version_callback) {
   if (preg_match('!\\$I'.'d: ([^\\$]+) Exp \\$!', $code, $version_info)) {
     $version_callback($version_info[1], $file);
   }
+  else {
+    // Unknown version information.
+    $version_callback($file .': n/a', $file);
+  }
 }
 
 /**
