@@ -389,8 +389,8 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
     if (count($strings)) {
       // Source string array was done, so export translations.
       foreach ($strings as $index => $string) {
-        if ($translation = db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.{$language_column} = '%s'", $string, $translation_export_langcode)) {
-          $output .= 'msgstr['. $index .'] '. _locale_export_string(_locale_export_remove_plural($translation->translation));
+        if ($translation = db_result(db_query("SELECT t.translation FROM {locales_source} s LEFT JOIN {locales_target} t ON t.lid = s.lid WHERE s.source = '%s' AND t.{$language_column} = '%s'", $string, $translation_export_langcode))) {
+          $output .= 'msgstr['. $index .'] '. _locale_export_string(_locale_export_remove_plural($translation));
         }
         else {
           $output .= "msgstr[". $index ." \"\"\n";
