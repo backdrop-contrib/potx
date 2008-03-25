@@ -393,7 +393,7 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
           $output .= 'msgstr['. $index .'] '. _locale_export_string(_locale_export_remove_plural($translation));
         }
         else {
-          $output .= "msgstr[". $index ." \"\"\n";
+          $output .= "msgstr[". $index ."] \"\"\n";
         }
       }
     }
