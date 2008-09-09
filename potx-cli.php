@@ -12,6 +12,11 @@
  *   POT files, errors are printed on STDERR.
  */
 
+if (isset($_SERVER['REQUEST_METHOD'])) {
+  // Try to prevent running this script from the web. It is not designed so.
+  print 'The potx-cli.php script is designed to be used from the command line. Please use the Drupal module web interface to extract strings through the web, instead of this script, if you prefer a web interface.';
+}
+
 // Functions shared with web based interface
 include dirname(__FILE__) .'/potx.inc';
 
