@@ -466,33 +466,35 @@ function _potx_write_files($http_filename = NULL, $content_disposition = 'inline
   global $_potx_store;
 
   // Generate file lists and output files.
-  foreach ($_potx_store as $file => $contents) {
-    // Build replacement for file listing.
-    if (count($contents['sources']) > 1) {
-      $filelist = "Generated from files:\n#  " . join("\n#  ", $contents['sources']);
-    }
-    elseif (count($contents['sources']) == 1) {
-      $filelist = "Generated from file: " . join('', $contents['sources']);
-    }
-    else {
-      $filelist = 'No version information was available in the source files.';
-    }
-    $output = str_replace('--VERSIONS--', $filelist, $contents['header'] . $contents['strings']);
-
-    if ($http_filename) {
-      // HTTP output.
-      header('Content-Type: text/plain; charset=utf-8');
-      header('Content-Transfer-Encoding: 8bit');
-      header("Content-Disposition: $content_disposition; filename=$http_filename");
-      print $output;
-      return;
-    }
-    else {
-      // Local file output, flatten directory structure.
-      $file = str_replace('.', '-', preg_replace('![/]?([a-zA-Z_0-9]*/)*!', '', $file)) .'.pot';
-      $fp = fopen($file, 'w');
-      fwrite($fp, $output);
-      fclose($fp);
+  if (is_array($_potx_store)) {
+    foreach ($_potx_store as $file => $contents) {
+      // Build replacement for file listing.
+      if (count($contents['sources']) > 1) {
+        $filelist = "Generated from files:\n#  " . join("\n#  ", $contents['sources']);
+      }
+      elseif (count($contents['sources']) == 1) {
+        $filelist = "Generated from file: " . join('', $contents['sources']);
+      }
+      else {
+        $filelist = 'No version information was available in the source files.';
+      }
+      $output = str_replace('--VERSIONS--', $filelist, $contents['header'] . $contents['strings']);
+  
+      if ($http_filename) {
+        // HTTP output.
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Content-Transfer-Encoding: 8bit');
+        header("Content-Disposition: $content_disposition; filename=$http_filename");
+        print $output;
+        return;
+      }
+      else {
+        // Local file output, flatten directory structure.
+        $file = str_replace('.', '-', preg_replace('![/]?([a-zA-Z_0-9]*/)*!', '', $file)) .'.pot';
+        $fp = fopen($file, 'w');
+        fwrite($fp, $output);
+        fclose($fp);
+      }
     }
   }
 }
@@ -1088,11 +1090,27 @@ function _potx_parse_js_string($string) {
  *   Add folder exceptions for other version control systems.
  */
 function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_6) {
-  $files = glob("$path$basename.{php,inc,module,engine,theme,install,info,profile". ($api_version == POTX_API_6 ? ',js}' :'}'), GLOB_BRACE);
-  $dirs = glob("$path*", GLOB_ONLYDIR);
-  foreach ($dirs as $dir) {
-    if (!preg_match("!(^|.+/)(CVS|.svn|.git)$!", $dir)) {
-      $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
+  // It would be so nice to just use GLOB_BRACE, but it is not available on all
+  // operarting systems, so we are working around the missing functionality.
+  $extensions = array('php', 'inc', 'module', 'engine', 'theme', 'install', 'info', 'profile');
+  if ($api_version == POTX_API_6) {
+    $extensions[] = 'js';
+  }
+  $files = array();
+  foreach ($extensions as $extension) {
+    $files_here = glob($path . $basename .'.'. $extension);
+    if (is_array($files_here)) {
+      $files = array_merge($files, $files_here);
+    }
+  }
+  
+  // Grab subdirectories.
+  $dirs = glob($path .'*', GLOB_ONLYDIR);
+  if (is_array($dirs)) {
+    foreach ($dirs as $dir) {
+      if (!preg_match("!(^|.+/)(CVS|.svn|.git)$!", $dir)) {
+        $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
+      }
     }
   }
   // Skip our own files, because we don't want to get strings from them 
