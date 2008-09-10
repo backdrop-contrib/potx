@@ -81,8 +81,17 @@ define('POTX_API_5', 5);
 
 /**
  * Parse source files in Drupal 6.x format.
+ * 
+ * Changes since 5.x documented at http://drupal.org/node/114774
  */
 define('POTX_API_6', 6);
+
+/**
+ * Parse source files in Drupal 7.x format.
+ * 
+ * Changes since 6.x documented at http://drupal.org/node/224333
+ */
+define('POTX_API_7', 7);
 
 /**
  * Process a file and put extracted information to the given parameters.
@@ -115,7 +124,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version);
     return;
   }
-  elseif ($name_parts['extension'] == 'js' && $api_version == POTX_API_6) {
+  elseif ($name_parts['extension'] == 'js' && $api_version > POTX_API_5) {
     _potx_parse_js_file($code, $file_name, $save_callback);
   }
 
@@ -160,7 +169,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   _potx_find_t_calls($file_name, $save_callback, '$t', POTX_STRING_BOTH);
   _potx_find_t_calls($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
 
-  if ($api_version == POTX_API_6) {
+  if ($api_version > POTX_API_5) {
     // Watchdog calls have both of their arguments translated in Drupal 6.x.
     _potx_find_watchdog_calls($file_name, $save_callback);
   }
@@ -174,7 +183,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 
   if ($name_parts['extension'] == 'module') {
     _potx_find_perm_hook($file_name, $name_parts['filename'], $save_callback);
-    if ($api_version == POTX_API_6) {  
+    if ($api_version > POTX_API_5) {  
       _potx_find_menu_hook($file_name, $name_parts['filename'], $save_callback);
     }  
     // Add the machine readable module name.
@@ -351,8 +360,8 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
   $string = stripcslashes($string);
   
   // Column and table name changed between versions.
-  $language_column = $api_version == POTX_API_6 ? 'language' : 'locale';
-  $language_table  = $api_version == POTX_API_6 ? 'languages' : 'locales_meta';
+  $language_column = $api_version > POTX_API_5 ? 'language' : 'locale';
+  $language_table  = $api_version > POTX_API_5 ? 'languages' : 'locales_meta';
   
   if (!isset($plural)) {
     // Single string to look translation up for.
@@ -421,7 +430,7 @@ function _potx_get_header($file, $template_export_langcode = NULL, $api_version 
   // We only have language to use if we should export with that langcode.
   $language = NULL;
   if (isset($template_export_langcode)) {
-    $language = db_fetch_object(db_query($api_version == POTX_API_6 ? "SELECT language, name, plurals, formula FROM {languages} WHERE language = '%s'" : "SELECT locale, name, plurals, formula FROM {locales_meta} WHERE locale = '%s'", $template_export_langcode));
+    $language = db_fetch_object(db_query($api_version > POTX_API_5 ? "SELECT language, name, plurals, formula FROM {languages} WHERE language = '%s'" : "SELECT locale, name, plurals, formula FROM {locales_meta} WHERE locale = '%s'", $template_export_langcode));
   }
 
   $output  = '# $'.'Id'.'$'."\n";
@@ -720,7 +729,7 @@ function _potx_find_format_plural_calls($file, $save_callback, $api_version = PO
         }
         // Get further parameters
         list($comma1, $singular, $comma2, $plural, $par2) = array($_potx_tokens[$tn], $_potx_tokens[$tn+1], $_potx_tokens[$tn+2], $_potx_tokens[$tn+3], $_potx_tokens[$tn+4]);
-        if (($comma2 == ',') && ($par2 == ')' || ($par2 == ',' && $api_version == POTX_API_6)) &&
+        if (($comma2 == ',') && ($par2 == ')' || ($par2 == ',' && $api_version > POTX_API_5)) &&
           (is_array($singular) && ($singular[0] == T_CONSTANT_ENCAPSED_STRING)) &&
           (is_array($plural) && ($plural[0] == T_CONSTANT_ENCAPSED_STRING))) {
             $save_callback(
@@ -863,7 +872,7 @@ function _potx_find_menu_hook($file, $filebase, $save_callback) {
 function _potx_find_language_names($file, $save_callback, $api_version = POTX_API_6) {
   global $_potx_tokens, $_potx_lookup;
 
-  foreach ($_potx_lookup[$api_version == POTX_API_6 ? '_locale_get_predefined_list' : '_locale_get_iso639_list'] as $ti) {
+  foreach ($_potx_lookup[$api_version > POTX_API_5 ? '_locale_get_predefined_list' : '_locale_get_iso639_list'] as $ti) {
     // Search for the definition of _locale_get_predefined_list(), not where it is called.
     if ($_potx_tokens[$ti-1][0] == T_FUNCTION) {
       break;
@@ -922,7 +931,7 @@ function _potx_find_version_number($code, $file, $version_callback) {
 function _potx_add_date_strings($file, $save_callback, $api_version = POTX_API_6) {
   for ($i = 1; $i <= 12; $i++) {
     $stamp = mktime(0, 0, 0, $i, 1, 1971);
-    $save_callback(($api_version == POTX_API_6 ? '!long-month-name ' : ''). date("F", $stamp), $file);
+    $save_callback(($api_version > POTX_API_5 ? '!long-month-name ' : ''). date("F", $stamp), $file);
     $save_callback(date("M", $stamp), $file);
   }
   for ($i = 0; $i <= 7; $i++) {
@@ -999,7 +1008,7 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $a
   $info = array();
 
   if (file_exists($file_path)) {
-    $info = $api_version == POTX_API_6 ? drupal_parse_info_file($file_path) : parse_ini_file($file_path);
+    $info = $api_version > POTX_API_5 ? drupal_parse_info_file($file_path) : parse_ini_file($file_path);
   }
 
   // We need the name, description and package values. Others,
@@ -1093,7 +1102,7 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   // It would be so nice to just use GLOB_BRACE, but it is not available on all
   // operarting systems, so we are working around the missing functionality.
   $extensions = array('php', 'inc', 'module', 'engine', 'theme', 'install', 'info', 'profile');
-  if ($api_version == POTX_API_6) {
+  if ($api_version > POTX_API_5) {
     $extensions[] = 'js';
   }
   $files = array();
