@@ -33,11 +33,18 @@ define('POTX_STATUS_SILENT', 0);
 define('POTX_STATUS_MESSAGE', 1);
 
 /**
- * Command line status reporting:
- *  - status to standard output
- *  - errors to standard error
+ * Command line status reporting.
+ * 
+ * Status goes to standard output, errors to standard error.
  */
 define('POTX_STATUS_CLI', 2);
+
+/**
+ * Structured array status logging.
+ *
+ * Useful for coder review status reporting.
+ */
+define('POTX_STATUS_STRUCTURED', 3);
 
 /**
  * Core parsing mode:
@@ -561,7 +568,7 @@ function _potx_marker_error($file, $line, $marker, $ti) {
     }
     $ti++;
   }
-  potx_status('error', t("Invalid marker content in %filename:%lineno\n* %marker(%tokens\n\n", array('%filename' => $file, '%lineno' => $line, '%marker' => $marker, '%tokens' => $tokens)));
+  potx_status('error', t('Invalid localization code: %marker%tokens', array('%marker' => $marker, '%tokens' => '('. $tokens)), $file, $line);
 }
 
 /**
@@ -570,14 +577,19 @@ function _potx_marker_error($file, $line, $marker, $ti) {
  * @param $op
  *   Operation to perform or type of message text.
  *     - set:    sets the reporting mode to $value
- *               use the POTX_STATUS_* constants as $values
+ *               use one of the POTX_STATUS_* constants as $value
  *     - get:    returns the list of error messages recorded
- *     - error:  sends an error message in $value
+ *               if $value is true, it also clears the internal message cache
+ *     - error:  sends an error message in $value with optional $file and $line
  *     - status: sends a status message in $value
  * @param $value
- *   Value depending on $op, unused with the 'get' op.
+ *   Value depending on $op.
+ * @param $file
+ *   Name of file the error message is related to.
+ * @param $line
+ *   Number of line the error message is related to.
  */
-function potx_status($op, $value) {
+function potx_status($op, $value = NULL, $file = NULL, $line = NULL) {
   static $mode = POTX_STATUS_CLI;
   static $messages = array();
   
@@ -590,24 +602,43 @@ function potx_status($op, $value) {
     case 'get':
       // Getting the errors. Optionally deleting the messages.
       $errors = $messages;
-      if ($value) {
+      if (!empty($value)) {
         $messages = array();
       }
       return $errors;
 
     case 'error':
     case 'status':
+      
+      // Location information is required in 3 of the four possible reporting
+      // modes as part of the error message. The structured mode needs the
+      // file and line info separately, not in the text.
+      $location_info = '';
+      if (($mode != POTX_STATUS_STRUCTURED) && isset($file)) {
+        if (isset($line)) {
+          $location_info = t('In %file on line %line.', array('%file' => $file, '%line' => $line));
+        }
+        else {
+          $location_info = t('In %file.', array('%file' => $file));
+        }
+      }
+      
       // Error message or progress text to display.
       switch ($mode) {
         case POTX_STATUS_MESSAGE:
-          drupal_set_message($value, $op);
+          drupal_set_message($value . ($location_info ? ' '. $location_info : ''), $op);
           break;
         case POTX_STATUS_CLI:
-          fwrite($op == 'error' ? STDERR : STDOUT, $value);
+          fwrite($op == 'error' ? STDERR : STDOUT, $value . ($location_info ? "\n". $location_info : '') ."\n\n");
           break;
         case POTX_STATUS_SILENT:
           if ($op == 'error') {
-            $messages[] = $value;
+            $messages[] = $value . ($location_info ? ' '. $location_info : '');
+          }
+          break;
+        case POTX_STATUS_STRUCTURED:
+          if ($op == 'error') {
+            $messages[] = array($value, $file, $line);
           }
           break;
       }
@@ -786,7 +817,7 @@ function _potx_find_perm_hook($file, $filebase, $save_callback) {
         }
       }
       if (!$count) {
-        potx_status('error', t("Found a hook_perm() implementation in %filename, but there were no literally provided permissions to record.\n\n", array('%filename' => $file)));
+        potx_status('error', t('Found a hook_perm() implementation, but there were no literally provided permissions to record.'), $file);
       }
     }
   }
@@ -850,7 +881,7 @@ function _potx_find_menu_hook($file, $filebase, $save_callback) {
             $tn+=2; // Jump forward by 2.
           }
           else {
-            potx_status('error', t("Invalid menu %element definition found in %hook in %filename on line %lineno\n\n", array('%element' => $_potx_tokens[$tn][1], '%filename' => $file, '%hook' => $filebase .'_menu()', '%lineno' => $_potx_tokens[$tn][2])));
+            potx_status('error', t('Invalid menu %element definition found in %hook.', array('%element' => $_potx_tokens[$tn][1], '%hook' => $filebase .'_menu()')), $file, $_potx_tokens[$tn][2]);
           }
         }
         $tn++;
@@ -1071,7 +1102,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   preg_match_all('~[^\w]Drupal\s*\.\s*(t|formatPlural)\s*\([^)]+\)~s', $code, $faulty_matches, PREG_SET_ORDER);
   if (isset($faulty_matches) && count($faulty_matches)) {
     foreach($faulty_matches as $index => $match) {
-      potx_status('error', t("Invalid marker content in %filename\n* %marker\n\n", array('%filename' => $file, '%marker' => $match[0])));
+      potx_status('error', t('Invalid localization code: %marker.', array('%marker' => $match[0])), $file);
     }
   }
 }

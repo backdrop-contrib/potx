@@ -318,15 +318,29 @@ function potx_reviews() {
 function potx_coder_review(&$coder_args, $review, $rule, $lines, &$results) {
   include_once drupal_get_path('module', 'potx') .'/potx.inc';
 
-  // Request collection of error messages internally.
-  potx_status('set', POTX_STATUS_SILENT);
-  // Process the file (but throw away the result);
-  _potx_process_file(realpath($coder_args['#filename']));
+  // Request collection of error messages internally in a structured format.
+  potx_status('set', POTX_STATUS_STRUCTURED);
+  // Process the file (but throw away the result).
+  $filename = realpath($coder_args['#filename']);
+  _potx_process_file($filename);
   // Grab the errors and empty the error list.
   $errors = potx_status('get', TRUE);
-  
+
   $severity_name = _coder_severity_name($coder_args, $review, $rule);
   foreach ($errors as $error) {
-    $results[] = theme('coder_warning', array('#warning' => $error), $severity_name, 0, '');
+    // Errors contain the message, file name (which we did not use here), and
+    // in most cases the line number for the error. Not all errors know about
+    // the exact line number, so it might not be there.
+    list($message, $file, $lineno) = $error;
+    if (empty($lineno)) {
+      // $lineno might be NULL so set to 0.
+      $lineno = 0;
+      $line = '';
+    }
+    else {
+      $line = $coder_args['#all_lines'][$lineno];
+    }
+    $rule['#warning'] = htmlspecialchars_decode($message, ENT_QUOTES);
+    _coder_error($results, $rule, $severity_name, $lineno, $line);
   }
 }
