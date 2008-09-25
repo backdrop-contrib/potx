@@ -333,7 +333,7 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
     // Store the generated output in the given file storage.
     if (!isset($_potx_store[$file_name])) {
       $_potx_store[$file_name] = array(
-        'header'  => $header_callback($file_name, $template_export_langcode, $translation_export_langcode, $api_version),
+        'header'  => $header_callback($file_name, $template_export_langcode, $api_version),
         'sources' => $file_list,
         'strings' => $output,
         'count'   => 1,
