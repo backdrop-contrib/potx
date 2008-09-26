@@ -339,6 +339,9 @@ function potx_coder_review(&$coder_args, $review, $rule, $lines, &$results) {
       $line = '';
     }
     else {
+      // potx numbers lines from 1 (as in text editors),
+      // coder from 0 (as in the array index I guess).
+      $lineno--;
       $line = $coder_args['#all_lines'][$lineno];
     }
     $rule['#warning'] = htmlspecialchars_decode($message, ENT_QUOTES);
