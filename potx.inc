@@ -545,8 +545,10 @@ function _potx_format_quoted_string($str) {
  *   Function name with which the error was identified
  * @param $ti
  *   Index on the token array
+ * @param $error
+ *   Helpful error message for users.
  */
-function _potx_marker_error($file, $line, $marker, $ti) {
+function _potx_marker_error($file, $line, $marker, $ti, $error) {
   global $_potx_tokens;
   
   $tokens = '';
@@ -568,7 +570,7 @@ function _potx_marker_error($file, $line, $marker, $ti) {
     }
     $ti++;
   }
-  potx_status('error', t('Invalid localization code: %marker%tokens', array('%marker' => $marker, '%tokens' => '('. $tokens)), $file, $line);
+  potx_status('error', $error, $file, $line, $marker .'('. $tokens);
 }
 
 /**
@@ -588,8 +590,10 @@ function _potx_marker_error($file, $line, $marker, $ti) {
  *   Name of file the error message is related to.
  * @param $line
  *   Number of line the error message is related to.
+ * @param $excerpt
+ *   Excerpt of the code in question, if available.
  */
-function potx_status($op, $value = NULL, $file = NULL, $line = NULL) {
+function potx_status($op, $value = NULL, $file = NULL, $line = NULL, $excerpt = NULL) {
   static $mode = POTX_STATUS_CLI;
   static $messages = array();
   
@@ -612,14 +616,24 @@ function potx_status($op, $value = NULL, $file = NULL, $line = NULL) {
       
       // Location information is required in 3 of the four possible reporting
       // modes as part of the error message. The structured mode needs the
-      // file and line info separately, not in the text.
+      // file, line and excerpt info separately, not in the text.
       $location_info = '';
       if (($mode != POTX_STATUS_STRUCTURED) && isset($file)) {
         if (isset($line)) {
-          $location_info = t('In %file on line %line.', array('%file' => $file, '%line' => $line));
+          if (isset($excerpt)) {
+            $location_info = t('At %excerpt in %file on line %line.', array('%excerpt' => $excerpt, '%file' => $file, '%line' => $line));
+          }
+          else {
+            $location_info = t('In %file on line %line.', array('%file' => $file, '%line' => $line));
+          }
         }
         else {
-          $location_info = t('In %file.', array('%file' => $file));
+          if (isset($excerpt)) {
+            $location_info = t('At %excerpt in %file.', array('%excerpt' => $excerpt, '%file' => $file));
+          }
+          else {
+            $location_info = t('In %file.', array('%file' => $file));
+          }
         }
       }
       
@@ -638,7 +652,7 @@ function potx_status($op, $value = NULL, $file = NULL, $line = NULL) {
           break;
         case POTX_STATUS_STRUCTURED:
           if ($op == 'error') {
-            $messages[] = array($value, $file, $line);
+            $messages[] = array($value, $file, $line, $excerpt);
           }
           break;
       }
@@ -679,7 +693,7 @@ function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string
         }
         else {
           // $function_name() found, but inside is something which is not a string literal.
-          _potx_marker_error($file, $line, $function_name, $ti);
+          _potx_marker_error($file, $line, $function_name, $ti, t('The first parameter to @function() should be a literal string. There should be no variables, concatenation, constants or other non-literal strings there.', array('@function' => $function_name)));
         }
       }
     }
@@ -716,7 +730,7 @@ function _potx_find_watchdog_calls($file, $save_callback) {
         }
         else {
           // watchdog() found, but inside is something which is not a string literal.
-          _potx_marker_error($file, $line, 'watchdog', $ti);
+          _potx_marker_error($file, $line, 'watchdog', $ti, t('The first two watchdog() parameters should be literal strings. There should be no variables, concatenation, constants or even a t() call there.'));
         }
       }
     }
@@ -771,7 +785,7 @@ function _potx_find_format_plural_calls($file, $save_callback, $api_version = PO
         }
         else {
           // format_plural() found, but the parameters are not correct.
-          _potx_marker_error($file, $line, "format_plural", $ti);
+          _potx_marker_error($file, $line, "format_plural", $ti, t('In format_plural(), the singular and plural strings should be literal strings. There should be no variables, concatenation, constants or even a t() call there.'));
         }
       }
     }
@@ -817,7 +831,7 @@ function _potx_find_perm_hook($file, $filebase, $save_callback) {
         }
       }
       if (!$count) {
-        potx_status('error', t('Found a hook_perm() implementation, but there were no literally provided permissions to record.'), $file);
+        potx_status('error', t('%hook should have an array of literal string permission names.', array('%hook' => $filebase .'_perm()')), $file);
       }
     }
   }
@@ -881,7 +895,7 @@ function _potx_find_menu_hook($file, $filebase, $save_callback) {
             $tn+=2; // Jump forward by 2.
           }
           else {
-            potx_status('error', t('Invalid menu %element definition found in %hook.', array('%element' => $_potx_tokens[$tn][1], '%hook' => $filebase .'_menu()')), $file, $_potx_tokens[$tn][2]);
+            potx_status('error', t('Invalid menu %element definition found in %hook. Title and description keys of the menu array should be literal strings.', array('%element' => $_potx_tokens[$tn][1], '%hook' => $filebase .'_menu()')), $file, $_potx_tokens[$tn][2]);
           }
         }
         $tn++;
@@ -1102,7 +1116,8 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   preg_match_all('~[^\w]Drupal\s*\.\s*(t|formatPlural)\s*\([^)]+\)~s', $code, $faulty_matches, PREG_SET_ORDER);
   if (isset($faulty_matches) && count($faulty_matches)) {
     foreach($faulty_matches as $index => $match) {
-      potx_status('error', t('Invalid localization code: %marker.', array('%marker' => $match[0])), $file);
+      $message = ($match[1] == 't') ? t('Drupal.t() calls should have a single literal string as their first parameter.') : t('The singular and plural string parameters on Drupal.formatPlural() calls should be literal strings, plural containing a @count placeholder.');
+      potx_status('error', $message, $file, NULL, $match[0]);
     }
   }
 }

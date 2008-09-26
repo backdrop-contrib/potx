@@ -328,10 +328,11 @@ function potx_coder_review(&$coder_args, $review, $rule, $lines, &$results) {
 
   $severity_name = _coder_severity_name($coder_args, $review, $rule);
   foreach ($errors as $error) {
-    // Errors contain the message, file name (which we did not use here), and
-    // in most cases the line number for the error. Not all errors know about
-    // the exact line number, so it might not be there.
-    list($message, $file, $lineno) = $error;
+    // Errors contain the message, file name (which we did not use here), in
+    // most cases the line number and in some cases a code excerpt for the
+    // error. Not all errors know about the exact line number, so it might
+    // not be there, in which case we provide some sensible defaults.
+    list($message, $file, $lineno, $excerpt) = $error;
     if (empty($lineno)) {
       // $lineno might be NULL so set to 0.
       $lineno = 0;
