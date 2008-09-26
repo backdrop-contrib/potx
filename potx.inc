@@ -597,7 +597,7 @@ function potx_status($op, $value = NULL, $file = NULL, $line = NULL, $excerpt = 
   static $mode = POTX_STATUS_CLI;
   static $messages = array();
   
-  switch($op) {
+  switch ($op) {
     case 'set':
       // Setting the reporting mode.
       $mode = $value;
@@ -976,7 +976,7 @@ function _potx_find_version_number($code, $file, $version_callback) {
 function _potx_add_date_strings($file, $save_callback, $api_version = POTX_API_6) {
   for ($i = 1; $i <= 12; $i++) {
     $stamp = mktime(0, 0, 0, $i, 1, 1971);
-    $save_callback(($api_version > POTX_API_5 ? '!long-month-name ' : ''). date("F", $stamp), $file);
+    $save_callback(($api_version > POTX_API_5 ? '!long-month-name ' : '') . date("F", $stamp), $file);
     $save_callback(date("M", $stamp), $file);
   }
   for ($i = 0; $i <= 7; $i++) {
@@ -1032,7 +1032,7 @@ function _potx_add_default_region_names($file, $save_callback, $api_version = PO
     'header' => 'Header',
     'footer' => 'Footer',
   );
-  foreach($regions as $region) {
+  foreach ($regions as $region) {
     $save_callback($region, $file);
   }
 }
@@ -1067,7 +1067,7 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $a
   
   // Add regions names from themes.
   if (isset($info['regions']) && is_array($info['regions'])) {
-    foreach($info['regions'] as $region => $region_name) {
+    foreach ($info['regions'] as $region => $region_name) {
       $save_callback($region_name, $file_name);
     }
   }
@@ -1088,7 +1088,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   // Note: \s also matches newlines with the 's' modifier.
   preg_match_all('~[^\w]Drupal\s*\.\s*t\s*\(\s*('. $js_string_regex .')\s*[,\)]~s', $code, $t_matches, PREG_SET_ORDER);
   if (isset($t_matches) && count($t_matches)) {
-    foreach($t_matches as $match) {
+    foreach ($t_matches as $match) {
       // Remove match from code to help us identify faulty Drupal.t() calls.
       $code = str_replace($match[0], '', $code);
       $save_callback(_potx_parse_js_string($match[1]), $file, 0);
@@ -1098,7 +1098,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   // Match all Drupal.formatPlural() calls in another array.
   preg_match_all('~[^\w]Drupal\s*\.\s*formatPlural\s*\(\s*.+?\s*,\s*('. $js_string_regex .')\s*,\s*((?:(?:\'(?:\\\\\'|[^\'])*@count(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*@count(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+)\s*[,\)]~s', $code, $plural_matches, PREG_SET_ORDER);
   if (isset($plural_matches) && count($plural_matches)) {
-    foreach($plural_matches as $index => $match) {
+    foreach ($plural_matches as $index => $match) {
       // Remove match from code to help us identify faulty
       // Drupal.formatPlural() calls later.
       $code = str_replace($match[0], '', $code);
@@ -1115,7 +1115,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   // the match), but we only need some unique part to identify the faulty calls.
   preg_match_all('~[^\w]Drupal\s*\.\s*(t|formatPlural)\s*\([^)]+\)~s', $code, $faulty_matches, PREG_SET_ORDER);
   if (isset($faulty_matches) && count($faulty_matches)) {
-    foreach($faulty_matches as $index => $match) {
+    foreach ($faulty_matches as $index => $match) {
       $message = ($match[1] == 't') ? t('Drupal.t() calls should have a single literal string as their first parameter.') : t('The singular and plural string parameters on Drupal.formatPlural() calls should be literal strings, plural containing a @count placeholder.');
       potx_status('error', $message, $file, NULL, $match[0]);
     }
@@ -1230,7 +1230,7 @@ function _potx_save_string($value = NULL, $file = NULL, $line = 0, $string_mode 
       case POTX_STRING_RUNTIME:
         // Mark runtime strings as duplicates of installer strings if
         // the string was both recorded in the runtime and in the installer.
-        $_potx_strings[$value][$file][] = $line .($string_mode == POTX_STRING_BOTH ? ' (dup)' : '');
+        $_potx_strings[$value][$file][] = $line . ($string_mode == POTX_STRING_BOTH ? ' (dup)' : '');
         break;
       case POTX_STRING_INSTALLER:
         $_potx_install[$value][$file][] = $line;

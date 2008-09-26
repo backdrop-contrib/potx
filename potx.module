@@ -209,8 +209,8 @@ function _potx_component_selector(&$form, &$components, $dirname = '') {
     $element = array(
       '#type' => 'fieldset',
       '#title' => t('Directory "@directory"', $t_args),
-      '#collapsible' => true,
-      '#collapsed' => true,
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
     );
     $form[_potx_form_id('fs', $dirname)] =& $element;
   }
