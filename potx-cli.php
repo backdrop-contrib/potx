@@ -107,9 +107,9 @@ return;
 // These are never executed, you can run potx-cli.php on itself to test it
 // -----------------------------------------------------------------------------
 
-$a = t("Test string 1" );
-$b = t("Test string 2 %string", array("%string" => "how do you do"));
-$c = t('Test string 3');
+$a = t("Double quoted test string" );
+$b = t("Test string with %variable", array('%variable' => t('variable replacement')));
+$c = t('Single qouted test string');
 $d = t("Special\ncharacters");
 $e = t('Special\ncharacters');
 $f = t("Embedded $variable");
@@ -118,11 +118,13 @@ $h = t("more \$special characters");
 $i = t('even more \$special characters');
 $j = t("Mixed 'quote' \"marks\"");
 $k = t('Mixed "quote" \'marks\'');
-$l = t('This is some repeating text');
-$m = t("This is some repeating text");
-$n = t(embedded_function_call());
-$o = format_plural($days, "one day", "@count days");
-$p = format_plural(embedded_function_call($count), "one day", "@count days");
+$l = t('Some repeating text');
+$m = t("Some repeating text");
+$n = t(embedded_function_call(3));
+$o = format_plural($days, 'one day', '@count days');
+$p = format_plural(embedded_function_call($count), 'one day', '@count days');
+$q = t('Concatenated' . 'string.' . 'You should never do this.');
+$r = t("Test string with @complex %variables !smile", array('@complex' => time(), '%variable' => t('variables'), '!smile' => ':)'));
 
 function embedded_function_call($dummy) { return 12; }
 
@@ -133,8 +135,4 @@ function potxcli_perm() {
 function potxcli_help($section = 'default') {
   watchdog('help', t('Help called'));
   return t('This is some help');
-}
-
-function potxcli_node_types() {
-  return array("extractor-cooltype", "extractor-evencooler");
 }
