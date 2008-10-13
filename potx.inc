@@ -189,7 +189,9 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   _potx_find_format_plural_calls($file_name, $save_callback, $api_version);
 
   if ($name_parts['extension'] == 'module') {
-    _potx_find_perm_hook($file_name, $name_parts['filename'], $save_callback);
+    if ($api_version < POTX_API_7) {
+      _potx_find_perm_hook($file_name, $name_parts['filename'], $save_callback);
+    }
     if ($api_version > POTX_API_5) {  
       _potx_find_menu_hook($file_name, $name_parts['filename'], $save_callback);
     }  
