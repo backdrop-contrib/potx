@@ -3,7 +3,6 @@
 # LANGUAGE translation of Drupal (general)
 # Copyright YEAR NAME <EMAIL@ADDRESS>
 # Generated from files:
-#  potx.inc,v 1.1.2.17.2.18 2008/09/10 10:15:47 goba
 #  potx.module,v 1.1.2.12.2.2.2.7 2008/09/26 10:52:11 goba
 #  potx.install,v 1.1.2.1 2008/09/25 06:49:33 goba
 #  potx.info,v 1.1.2.3.2.2 2007/11/12 20:19:06 goba
@@ -12,7 +11,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
-"POT-Creation-Date: 2008-09-26 16:35+0200\n"
+"POT-Creation-Date: 2008-10-13 23:52+0200\n"
 "PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
 "Last-Translator: NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
@@ -20,22 +19,6 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
-
-#: potx6.inc:564
-msgid "Invalid marker content in %filename:%lineno\n* %marker(%tokens\n\n"
-msgstr ""
-
-#: potx6.inc:770
-msgid "Found a hook_perm() implementation in %filename, but there were no literally provided permissions to record.\n\n"
-msgstr ""
-
-#: potx6.inc:834
-msgid "Invalid menu %element definition found in %hook in %filename on line %lineno\n\n"
-msgstr ""
-
-#: potx6.inc:1055
-msgid "Invalid marker content in %filename\n* %marker\n\n"
-msgstr ""
 
 #: potx.module:20
 msgid "This page allows you to generate translation templates for module and theme files. Select the module or theme you wish to generate a template file for. A single Gettext Portable Object (Template) file is generated, so you can easily save it and start translation."
