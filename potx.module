@@ -332,7 +332,7 @@ function potx_coder_review(&$coder_args, $review, $rule, $lines, &$results) {
     // most cases the line number and in some cases a code excerpt for the
     // error. Not all errors know about the exact line number, so it might
     // not be there, in which case we provide some sensible defaults.
-    list($message, $file, $lineno, $excerpt) = $error;
+    list($message, $file, $lineno, $excerpt, $docs_url) = $error;
     if (empty($lineno)) {
       // $lineno might be NULL so set to 0.
       $lineno = 0;
@@ -344,7 +344,7 @@ function potx_coder_review(&$coder_args, $review, $rule, $lines, &$results) {
       $lineno--;
       $line = $coder_args['#all_lines'][$lineno];
     }
-    $rule['#warning'] = htmlspecialchars_decode($message, ENT_QUOTES);
+    $rule['#warning'] = htmlspecialchars_decode($message, ENT_QUOTES) . (!empty($docs_url) ? (' <a href="'. $docs_url .'">'. t('Read the documentation') .'</a>.') : '');
     _coder_error($results, $rule, $severity_name, $lineno, $line);
   }
 }

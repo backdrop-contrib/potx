@@ -549,8 +549,10 @@ function _potx_format_quoted_string($str) {
  *   Index on the token array
  * @param $error
  *   Helpful error message for users.
+ * @param $docs_url
+ *   Documentation reference.
  */
-function _potx_marker_error($file, $line, $marker, $ti, $error) {
+function _potx_marker_error($file, $line, $marker, $ti, $error, $docs_url = NULL) {
   global $_potx_tokens;
   
   $tokens = '';
@@ -572,7 +574,7 @@ function _potx_marker_error($file, $line, $marker, $ti, $error) {
     }
     $ti++;
   }
-  potx_status('error', $error, $file, $line, $marker .'('. $tokens);
+  potx_status('error', $error, $file, $line, $marker .'('. $tokens, $docs_url);
 }
 
 /**
@@ -594,8 +596,10 @@ function _potx_marker_error($file, $line, $marker, $ti, $error) {
  *   Number of line the error message is related to.
  * @param $excerpt
  *   Excerpt of the code in question, if available.
+ * @param $docs_url
+ *   URL to the guidelines to follow to fix the problem.
  */
-function potx_status($op, $value = NULL, $file = NULL, $line = NULL, $excerpt = NULL) {
+function potx_status($op, $value = NULL, $file = NULL, $line = NULL, $excerpt = NULL, $docs_url = NULL) {
   static $mode = POTX_STATUS_CLI;
   static $messages = array();
   
@@ -639,22 +643,28 @@ function potx_status($op, $value = NULL, $file = NULL, $line = NULL, $excerpt = 
         }
       }
       
+      // Documentation helpers are provided as readable text in most modes.
+      $read_more = '';
+      if (($mode != POTX_STATUS_STRUCTURED) && isset($docs_url)) {
+        $read_more = ($mode == POTX_STATUS_CLI) ? t('Read more at @url', array('@url' => $docs_url)) : t('Read more at <a href="@url">@url</a>', array('@url' => $docs_url));
+      }
+      
       // Error message or progress text to display.
       switch ($mode) {
         case POTX_STATUS_MESSAGE:
-          drupal_set_message($value . ($location_info ? ' '. $location_info : ''), $op);
+          drupal_set_message(join(' ', array($value, $location_info, $read_more)), $op);
           break;
         case POTX_STATUS_CLI:
-          fwrite($op == 'error' ? STDERR : STDOUT, $value . ($location_info ? "\n". $location_info : '') ."\n\n");
+          fwrite($op == 'error' ? STDERR : STDOUT, join("\n", array($value, $location_info, $read_more)) ."\n\n");
           break;
         case POTX_STATUS_SILENT:
           if ($op == 'error') {
-            $messages[] = $value . ($location_info ? ' '. $location_info : '');
+            $messages[] = join(' ', array($value, $location_info, $read_more));
           }
           break;
         case POTX_STATUS_STRUCTURED:
           if ($op == 'error') {
-            $messages[] = array($value, $file, $line, $excerpt);
+            $messages[] = array($value, $file, $line, $excerpt, $docs_url);
           }
           break;
       }
@@ -695,7 +705,7 @@ function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string
         }
         else {
           // $function_name() found, but inside is something which is not a string literal.
-          _potx_marker_error($file, $line, $function_name, $ti, t('The first parameter to @function() should be a literal string. There should be no variables, concatenation, constants or other non-literal strings there.', array('@function' => $function_name)));
+          _potx_marker_error($file, $line, $function_name, $ti, t('The first parameter to @function() should be a literal string. There should be no variables, concatenation, constants or other non-literal strings there.', array('@function' => $function_name)), 'http://drupal.org/node/322732');
         }
       }
     }
@@ -732,7 +742,7 @@ function _potx_find_watchdog_calls($file, $save_callback) {
         }
         else {
           // watchdog() found, but inside is something which is not a string literal.
-          _potx_marker_error($file, $line, 'watchdog', $ti, t('The first two watchdog() parameters should be literal strings. There should be no variables, concatenation, constants or even a t() call there.'));
+          _potx_marker_error($file, $line, 'watchdog', $ti, t('The first two watchdog() parameters should be literal strings. There should be no variables, concatenation, constants or even a t() call there.'), 'http://drupal.org/node/323101');
         }
       }
     }
@@ -787,7 +797,7 @@ function _potx_find_format_plural_calls($file, $save_callback, $api_version = PO
         }
         else {
           // format_plural() found, but the parameters are not correct.
-          _potx_marker_error($file, $line, "format_plural", $ti, t('In format_plural(), the singular and plural strings should be literal strings. There should be no variables, concatenation, constants or even a t() call there.'));
+          _potx_marker_error($file, $line, "format_plural", $ti, t('In format_plural(), the singular and plural strings should be literal strings. There should be no variables, concatenation, constants or even a t() call there.'), 'http://drupal.org/node/323072');
         }
       }
     }
@@ -833,7 +843,7 @@ function _potx_find_perm_hook($file, $filebase, $save_callback) {
         }
       }
       if (!$count) {
-        potx_status('error', t('%hook should have an array of literal string permission names.', array('%hook' => $filebase .'_perm()')), $file);
+        potx_status('error', t('%hook should have an array of literal string permission names.', array('%hook' => $filebase .'_perm()')), $file, NULL, NULL, 'http://drupal.org/node/323101');
       }
     }
   }
@@ -897,7 +907,7 @@ function _potx_find_menu_hook($file, $filebase, $save_callback) {
             $tn+=2; // Jump forward by 2.
           }
           else {
-            potx_status('error', t('Invalid menu %element definition found in %hook. Title and description keys of the menu array should be literal strings.', array('%element' => $_potx_tokens[$tn][1], '%hook' => $filebase .'_menu()')), $file, $_potx_tokens[$tn][2]);
+            potx_status('error', t('Invalid menu %element definition found in %hook. Title and description keys of the menu array should be literal strings.', array('%element' => $_potx_tokens[$tn][1], '%hook' => $filebase .'_menu()')), $file, $_potx_tokens[$tn][2], NULL, 'http://drupal.org/node/323101');
           }
         }
         $tn++;
@@ -1119,7 +1129,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   if (isset($faulty_matches) && count($faulty_matches)) {
     foreach ($faulty_matches as $index => $match) {
       $message = ($match[1] == 't') ? t('Drupal.t() calls should have a single literal string as their first parameter.') : t('The singular and plural string parameters on Drupal.formatPlural() calls should be literal strings, plural containing a @count placeholder.');
-      potx_status('error', $message, $file, NULL, $match[0]);
+      potx_status('error', $message, $file, NULL, $match[0], 'http://drupal.org/node/323109');
     }
   }
 }
