@@ -890,7 +890,7 @@ function _potx_find_end_of_function($here) {
 function _potx_find_menu_hook($file, $filebase, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
   
-  if (is_array($_potx_lookup[$filebase .'_menu'])) {
+  if (isset($_potx_lookup[$filebase .'_menu']) && is_array($_potx_lookup[$filebase .'_menu'])) {
     // We have a menu hook in this file.
     foreach ($_potx_lookup[$filebase .'_menu'] as $ti) {
       $end = _potx_find_end_of_function($ti);

@@ -114,10 +114,9 @@ function potx_select_form_submit($form, &$form_state) {
 
   if (isset($pathinfo['extension'])) {
     // A specific module or theme file was requested (otherwise there should be no extension). 
-    $filename = preg_replace('!^(.+)'. preg_quote($pathinfo['extension'], '!') .'$!', '\1', $pathinfo['basename']);
-    $files = _potx_explore_dir($pathinfo['dirname'] .'/', $filename);
+    $files = _potx_explore_dir($pathinfo['dirname'] .'/', $pathinfo['filename']);
     $strip_prefix = 1 + strlen($pathinfo['dirname']);
-    $outputname = $filename;
+    $outputname = $pathinfo['filename'];
   }
   // A directory name was requested.
   else {
