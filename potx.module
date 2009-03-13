@@ -110,6 +110,10 @@ function potx_select_form_submit($form, &$form_state) {
   
   $component = $form_state['values']['component'];
   $pathinfo = pathinfo($component);
+  if (!isset($pathinfo['filename'])) {
+    // The filename key is only available in PHP 5.2.0+
+    $pathinfo['filename'] = substr($pathinfo['basename'], 0, strrpos($pathinfo['basename'], '.'));
+  }
   $strip_prefix = 0;
 
   if (isset($pathinfo['extension'])) {
