@@ -1169,6 +1169,14 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
     if (is_array($files_here)) {
       $files = array_merge($files, $files_here);
     }
+    if ($basename != '*') {
+      // Basename was specific, so look for things like basename.admin.inc as well.
+      // If the basnename was *, the above glob() already covered this case.
+      $files_here = glob($path . $basename .'.*.'. $extension);
+      if (is_array($files_here)) {
+        $files = array_merge($files, $files_here);
+      }
+    }
   }
   
   // Grab subdirectories.
