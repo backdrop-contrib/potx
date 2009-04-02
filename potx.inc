@@ -194,13 +194,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     }
     if ($api_version > POTX_API_5) {  
       _potx_find_menu_hook($file_name, $name_parts['filename'], $save_callback);
-    }  
-    // Add the machine readable module name.
-    $save_callback($name_parts['filename'], $file_name);
-  }
-  elseif ($name_parts['extension'] == 'theme') {
-    // Add the theme name.
-    $save_callback($name_parts['filename'], $file_name);
+    }
   }
 
   // Special handling of some Drupal core files.
