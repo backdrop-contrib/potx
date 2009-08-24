@@ -1414,9 +1414,10 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   }
   // Skip our own files, because we don't want to get strings from them
   // to appear in the output, especially with the command line interface.
+  // Also exclude API files from being parsed.
   // TODO: fix this to be able to autogenerate templates for potx itself.
   foreach ($files as $id => $file_name) {
-    if (preg_match('!(potx-cli.php|potx.inc)$!', $file_name)) {
+    if (preg_match('!(potx-cli\.php|potx\.inc|\.api\.php)$!', $file_name)) {
       unset($files[$id]);
     }
   }
