@@ -275,7 +275,7 @@ function _potx_form_id($type, $path) {
 function _potx_component_list() {
   $components = array();
   // Get a list of all enabled modules and themes.
-  $result = db_query("SELECT name, filename, type, status FROM {system} WHERE type IN ('module', 'theme') AND status = 1 ORDER BY filename ASC");
+  $result = db_query("SELECT name, filename, type, status FROM {system} WHERE type IN ('module', 'theme') ORDER BY filename ASC");
   while ($component = db_fetch_object($result)) {
     // Build directory tree structure.
     $path_parts = explode('/', dirname($component->filename));
