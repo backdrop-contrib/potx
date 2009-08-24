@@ -173,10 +173,10 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     }
     // Collect line numbers.
     if (is_array($token)) {
-      $line_number += count(split("\n", $token[1])) - 1;
+      $line_number += count(explode("\n", $token[1])) - 1;
     }
     else {
-      $line_number += count(split("\n", $token)) - 1;
+      $line_number += count(explode("\n", $token)) - 1;
     }
   }
   unset($raw_tokens);
