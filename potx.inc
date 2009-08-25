@@ -23,6 +23,13 @@
  */
 
 /**
+ * The current Drupal major API verion.
+ * 
+ * This should be the only difference between different branches of potx.inc
+ */
+define('POTX_API_CURRENT', 6);
+
+/**
  * Silence status reports.
  */
 define('POTX_STATUS_SILENT', 0);
@@ -124,7 +131,7 @@ define('POTX_CONTEXT_ERROR', FALSE);
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_potx_save_string', $version_callback = '_potx_save_version', $api_version = POTX_API_6) {
+function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_potx_save_string', $version_callback = '_potx_save_version', $api_version = POTX_API_CURRENT) {
   global $_potx_tokens, $_potx_lookup;
 
   // Figure out the basename and extension to select extraction method.
@@ -263,7 +270,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POTX_BUILD_SINGLE, $force_name = 'general',  $save_callback = '_potx_save_string', $version_callback = '_potx_save_version', $header_callback = '_potx_get_header', $template_export_langcode = NULL, $translation_export_langcode = NULL, $api_version = POTX_API_6) {
+function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POTX_BUILD_SINGLE, $force_name = 'general',  $save_callback = '_potx_save_string', $version_callback = '_potx_save_version', $header_callback = '_potx_get_header', $template_export_langcode = NULL, $translation_export_langcode = NULL, $api_version = POTX_API_CURRENT) {
   global $_potx_store;
 
   // Get strings and versions by reference.
@@ -387,7 +394,7 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_translation_export($translation_export_langcode, $string, $plural = NULL, $api_version = POTX_API_6) {
+function _potx_translation_export($translation_export_langcode, $string, $plural = NULL, $api_version = POTX_API_CURRENT) {
   include_once 'includes/locale.inc';
 
   // Stip out slash escapes.
@@ -460,7 +467,7 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_get_header($file, $template_export_langcode = NULL, $api_version = POTX_API_6) {
+function _potx_get_header($file, $template_export_langcode = NULL, $api_version = POTX_API_CURRENT) {
   // We only have language to use if we should export with that langcode.
   $language = NULL;
   if (isset($template_export_langcode)) {
@@ -844,7 +851,7 @@ function _potx_find_watchdog_calls($file, $save_callback) {
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_find_format_plural_calls($file, $save_callback, $api_version = POTX_API_6) {
+function _potx_find_format_plural_calls($file, $save_callback, $api_version = POTX_API_CURRENT) {
   global $_potx_tokens, $_potx_lookup;
 
   if (isset($_potx_lookup['format_plural'])) {
@@ -1117,7 +1124,7 @@ function _potx_find_menu_hook($file, $filebase, $save_callback) {
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_find_language_names($file, $save_callback, $api_version = POTX_API_6) {
+function _potx_find_language_names($file, $save_callback, $api_version = POTX_API_CURRENT) {
   global $_potx_tokens, $_potx_lookup;
 
   foreach ($_potx_lookup[$api_version > POTX_API_5 ? '_locale_get_predefined_list' : '_locale_get_iso639_list'] as $ti) {
@@ -1177,7 +1184,7 @@ function _potx_find_version_number($code, $file, $version_callback) {
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_add_date_strings($file, $save_callback, $api_version = POTX_API_6) {
+function _potx_add_date_strings($file, $save_callback, $api_version = POTX_API_CURRENT) {
   for ($i = 1; $i <= 12; $i++) {
     $stamp = mktime(0, 0, 0, $i, 1, 1971);
     if ($api_version > POTX_API_6) {
@@ -1217,7 +1224,7 @@ function _potx_add_date_strings($file, $save_callback, $api_version = POTX_API_6
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_add_format_interval_strings($file, $save_callback, $api_version = POTX_API_6) {
+function _potx_add_format_interval_strings($file, $save_callback, $api_version = POTX_API_CURRENT) {
   $components = array(
     '1 year' => '@count years',
     '1 week' => '@count weeks',
@@ -1248,7 +1255,7 @@ function _potx_add_format_interval_strings($file, $save_callback, $api_version =
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_add_default_region_names($file, $save_callback, $api_version = POTX_API_6) {
+function _potx_add_default_region_names($file, $save_callback, $api_version = POTX_API_CURRENT) {
   $regions = array(
     'left' => 'Left sidebar',
     'right' => 'Right sidebar',
@@ -1280,7 +1287,7 @@ function _potx_add_default_region_names($file, $save_callback, $api_version = PO
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version = POTX_API_6) {
+function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
   $info = array();
 
   if (file_exists($file_path)) {
@@ -1380,7 +1387,7 @@ function _potx_parse_js_string($string) {
  * @todo
  *   Add folder exceptions for other version control systems.
  */
-function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_6) {
+function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_CURRENT) {
   // It would be so nice to just use GLOB_BRACE, but it is not available on all
   // operarting systems, so we are working around the missing functionality.
   $extensions = array('php', 'inc', 'module', 'engine', 'theme', 'install', 'info', 'profile');
