@@ -19,6 +19,10 @@ function potx_test_5_menu($may_cache) {
       'access' => user_access('access content'),
       'callback' => 'potx_test_5_page',
     );
+    $items[] = array('path' =>
+      'test-empty-t',
+      'title' => t(''),
+    );
   }
   return $items;
 }
@@ -32,10 +36,11 @@ function potx_test_5_page() {
   $t('Dynamic callback test string');
   
   t('Test string in context', array(), array('context' => 'Test context'));
+  t('');
 }
 
 function potx_test_5_perm() {
-  return array('test potx permission', 'one more test potx permission');
+  return array('test potx permission', 'one more test potx permission', '');
 }
 
 function potx_test_5_permission() {

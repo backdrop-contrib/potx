@@ -1476,6 +1476,16 @@ function _potx_save_string($value = NULL, $context = NULL, $file = NULL, $line =
   global $_potx_strings, $_potx_install;
 
   if (isset($value)) {
+    
+    // Value set but empty. Mark error on empty translatable string. Only trim
+    // for empty string checking, since we should store leading/trailing
+    // whitespace as it appears in the string otherwise.
+    $check_empty = trim($value);
+    if (empty($check_empty)) {
+      potx_status('error', t('Empty string attempted to be localized. Please do not leave test code for localization in your source.'), $file, $line);
+      return;
+    }
+    
     switch ($string_mode) {
       case POTX_STRING_BOTH:
         // Mark installer strings as duplicates of runtime strings if

@@ -16,6 +16,9 @@ function potx_test_6_menu() {
     'description' => 'This is a test menu item',
     'page callback' => 'potx_test_6_page',
   );
+  $items['translate/test-empty'] = array(
+    'title' => '',
+  );
   return $items;
 }
 
@@ -28,10 +31,11 @@ function potx_test_6_page() {
   $t('Dynamic callback test string');
   
   t('Test string in context', array(), array('context' => 'Test context'));
+  t('');
 }
 
 function potx_test_6_perm() {
-  return array('test potx permission', 'one more test potx permission');
+  return array('test potx permission', 'one more test potx permission', '');
 }
 
 function potx_test_6_permission() {

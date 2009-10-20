@@ -21,6 +21,8 @@ class PotxTestCase extends DrupalWebTestCase {
     parent::setUp('locale', 'potx');
     // Add potx.inc which we test for its functionality.
     include_once(drupal_get_path('module', 'potx') .'/potx.inc');
+    // Store empty error message for reuse in multiple cases.
+    $this->empty_error = t('Empty string attempted to be localized. Please do not leave test code for localization in your source.');
   }
 
   /**
@@ -57,6 +59,11 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Dynamic callback test string');
     $this->assertNoMsgID('1 test string');
     $this->assertNoMsgID('This is a test string.');
+    
+    $this->assert(count($this->potx_status) == 3, t('3 error messages found'));
+    $this->assert($this->potx_status[0][0] == $this->empty_error, t('First empty error found.'));
+    $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));
+    $this->assert($this->potx_status[2][0] == $this->empty_error, t('Third empty error found.'));
   }
 
   /**
@@ -92,6 +99,11 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Dynamic callback test string');
     $this->assertNoMsgID('1 test string');
     $this->assertNoMsgID('This is a test string.');
+
+    $this->assert(count($this->potx_status) == 3, t('3 error messages found'));
+    $this->assert($this->potx_status[0][0] == $this->empty_error, t('First empty error found.'));
+    $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));
+    $this->assert($this->potx_status[2][0] == $this->empty_error, t('Third empty error found.'));
   }
   
   /**
@@ -132,6 +144,10 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Dynamic callback test string');
     $this->assertNoMsgID('1 test string');
     $this->assertNoMsgID('This is a test string.');
+
+    $this->assert(count($this->potx_status) == 2, t('2 error messages found'));
+    $this->assert($this->potx_status[0][0] == $this->empty_error, t('First empty error found.'));
+    $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));
   }
 
   /**
@@ -162,6 +178,9 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertPluralID('@count test strings in JS');
     $this->assertMsgID('Another test string in JS');
     $this->assertMsgID('Embedded test string in JS');
+
+    $this->assert(count($this->potx_status) == 1, t('1 error message found'));
+    $this->assert($this->potx_status[0][0] == $this->empty_error, t('Empty error found.'));
   }
 
   /**
@@ -171,6 +190,7 @@ class PotxTestCase extends DrupalWebTestCase {
     global $_potx_store, $_potx_strings, $_potx_install;
     $_potx_store = $_potx_strings = $_potx_install = array();
     
+    potx_status('set', POTX_STATUS_STRUCTURED);
     _potx_process_file($filename, 0, '_potx_save_string', '_potx_save_version', $api_version);
     _potx_build_files($string_mode, POTX_BUILD_SINGLE, 'general', '_potx_save_string', '_potx_save_version', '_potx_get_header', NULL, NULL, $api_version);
 
@@ -178,8 +198,10 @@ class PotxTestCase extends DrupalWebTestCase {
     ob_start();
     _potx_write_files('potx-test.po');
     $this->potx_output = ob_get_clean();
-    $this->pass(var_export($this->potx_output, TRUE));
-  }
+    // $this->pass(var_export($this->potx_output, TRUE));
+    $this->potx_status = potx_status('get', TRUE);
+    // $this->pass(var_export($this->potx_status, TRUE));
+}
   
   /**
    * Helper function to assert an msgid construct in the .po file.
@@ -229,6 +251,20 @@ class PotxTestCase extends DrupalWebTestCase {
       $message = t('Plural ID "@raw" found', array('@raw' => check_plain($string)));
     }
     $this->assert(strpos($this->potx_output, 'msgid_plural "'. _potx_format_quoted_string('"'. $string . '"') .'"') !== FALSE, $message, $group);
+  }
+
+  /**
+   * Debug functionality until simpletest built-in debugging is backported.
+   */
+  private function outputScreenContents($description = 'output', $basename = 'output') {
+    // This is a hack to get a directory that won't be cleaned up by simpletest
+    $file_dir = file_directory_path() .'/../simpletest_output_pages';
+    if (!is_dir($file_dir)) {
+      mkdir($file_dir, 0777, TRUE);
+    }
+    $output_path = "$file_dir/$basename.". $this->randomName(10) .'.html';
+    $rv = file_put_contents($output_path, $this->drupalGetContent());
+    $this->pass("$description: ". l('Contents of result page', $output_path));
   }
 
 }
