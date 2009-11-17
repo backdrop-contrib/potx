@@ -1384,10 +1384,12 @@ function _potx_parse_js_string($string) {
  *   (ie. to collect files for a specific module).
  * @param $api_version
  *   Drupal API version to work with.
- * @todo
- *   Add folder exceptions for other version control systems.
+ * @param $skip_self
+ *   Skip potx related files. To be used when command line type of extraction
+ *   is used and the potx files at in the webroot, and their strings should not
+ *   end up in the generated template. Set to TRUE if skiping is needed.
  */
-function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_CURRENT) {
+function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_CURRENT, $skip_self = FALSE) {
   // It would be so nice to just use GLOB_BRACE, but it is not available on all
   // operarting systems, so we are working around the missing functionality.
   $extensions = array('php', 'inc', 'module', 'engine', 'theme', 'install', 'info', 'profile');
@@ -1419,12 +1421,11 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
       }
     }
   }
-  // Skip our own files, because we don't want to get strings from them
-  // to appear in the output, especially with the command line interface.
-  // Also exclude API files from being parsed.
-  // TODO: fix this to be able to autogenerate templates for potx itself.
+
+  // Skip API files. Also skip our own files, if that was requested.
+  $skip_pattern = ($skip_self ? '!(potx-cli\.php|potx\.inc|\.api\.php)$!' : '!\.api\.php$!');
   foreach ($files as $id => $file_name) {
-    if (preg_match('!(potx-cli\.php|potx\.inc|\.api\.php)$!', $file_name)) {
+    if (preg_match($skip_pattern, $file_name)) {
       unset($files[$id]);
     }
   }

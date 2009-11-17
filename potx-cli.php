@@ -82,14 +82,14 @@ END;
       $files = array(__FILE__);
       break;
     case '--auto' :
-      $files = _potx_explore_dir();
+      $files = _potx_explore_dir('', '*', POTX_API_CURRENT, TRUE);
       break;
   }
 }
 
 // Fall back to --auto, if --files are not specified
 if (empty($files)) {
-  $files = _potx_explore_dir();
+  $files = _potx_explore_dir('', '*', POTX_API_CURRENT, TRUE);
 }
 
 foreach ($files as $file) {
