@@ -24,7 +24,7 @@
 
 /**
  * The current Drupal major API verion.
- * 
+ *
  * This should be the only difference between different branches of potx.inc
  */
 define('POTX_API_CURRENT', 6);
@@ -335,11 +335,11 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
       if (strpos($string, "\0") !== FALSE) {
         // Plural strings have a null byte delimited format.
         list($singular, $plural) = explode("\0", $string);
-        $output .= "msgid \"$singular\"\n";
-        $output .= "msgid_plural \"$plural\"\n";
         if (!empty($context)) {
           $output .= "msgctxt \"$context\"\n";
         }
+        $output .= "msgid \"$singular\"\n";
+        $output .= "msgid_plural \"$plural\"\n";
         if (isset($translation_export_langcode)) {
           $output .= _potx_translation_export($translation_export_langcode, $singular, $plural, $api_version);
         }
@@ -350,10 +350,10 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
       }
       else {
         // Simple strings.
-        $output .= "msgid \"$string\"\n";
         if (!empty($context)) {
           $output .= "msgctxt \"$context\"\n";
         }
+        $output .= "msgid \"$string\"\n";
         if (isset($translation_export_langcode)) {
           $output .= _potx_translation_export($translation_export_langcode, $string, NULL, $api_version);
         }
@@ -1477,7 +1477,7 @@ function _potx_save_string($value = NULL, $context = NULL, $file = NULL, $line =
   global $_potx_strings, $_potx_install;
 
   if (isset($value)) {
-    
+
     // Value set but empty. Mark error on empty translatable string. Only trim
     // for empty string checking, since we should store leading/trailing
     // whitespace as it appears in the string otherwise.
@@ -1486,7 +1486,7 @@ function _potx_save_string($value = NULL, $context = NULL, $file = NULL, $line =
       potx_status('error', t('Empty string attempted to be localized. Please do not leave test code for localization in your source.'), $file, $line);
       return;
     }
-    
+
     switch ($string_mode) {
       case POTX_STRING_BOTH:
         // Mark installer strings as duplicates of runtime strings if
