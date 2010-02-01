@@ -1519,7 +1519,7 @@ if (!function_exists('t')) {
 if (!function_exists('drupal_parse_info_file')) {
   // If invoked outside of Drupal, drupal_parse_info_file() will not be available,
   // but we need this function to properly parse Drupal 6/7 .info files.
-  // Directly copied from common.inc,v 1.704 2007/10/19 10:30:54 goba Exp.
+  // Directly copied from common.inc,v 1.756.2.76 2010/02/01 16:01:41 goba Exp.
   function drupal_parse_info_file($filename) {
     $info = array();
     $constants = get_defined_constants();
