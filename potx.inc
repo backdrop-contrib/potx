@@ -1522,6 +1522,7 @@ if (!function_exists('drupal_parse_info_file')) {
   // Directly copied from common.inc,v 1.704 2007/10/19 10:30:54 goba Exp.
   function drupal_parse_info_file($filename) {
     $info = array();
+    $constants = get_defined_constants();
 
     if (!file_exists($filename)) {
       return $info;
@@ -1565,9 +1566,9 @@ if (!function_exists('drupal_parse_info_file')) {
           $parent = &$parent[$key];
         }
 
-        // Handle PHP constants
-        if (defined($value)) {
-          $value = constant($value);
+        // Handle PHP constants.
+        if (isset($constants[$value])) {
+          $value = $constants[$value];
         }
 
         // Insert actual value
