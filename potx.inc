@@ -1422,8 +1422,8 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
     }
   }
 
-  // Skip API files. Also skip our own files, if that was requested.
-  $skip_pattern = ($skip_self ? '!(potx-cli\.php|potx\.inc|\.api\.php)$!' : '!\.api\.php$!');
+  // Skip API and test files. Also skip our own files, if that was requested.
+  $skip_pattern = ($skip_self ? '!(potx-cli\.php|potx\.inc|\.api\.php|\.test)$!' : '!(\.api\.php|\.test)$!');
   foreach ($files as $id => $file_name) {
     if (preg_match($skip_pattern, $file_name)) {
       unset($files[$id]);
