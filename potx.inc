@@ -1300,7 +1300,7 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $a
   foreach (array('name', 'description', 'package') as $key) {
     if (isset($info[$key])) {
       // No context support for .info file strings.
-      $save_callback($info[$key], POTX_CONTEXT_NONE, $file_name);
+      $save_callback(addcslashes($info[$key], "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
     }
   }
 
@@ -1308,7 +1308,7 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $a
   if (isset($info['regions']) && is_array($info['regions'])) {
     foreach ($info['regions'] as $region => $region_name) {
       // No context support for .info file strings.
-      $save_callback($region_name, POTX_CONTEXT_NONE, $file_name);
+      $save_callback(addcslashes($region_name, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
     }
   }
 }
