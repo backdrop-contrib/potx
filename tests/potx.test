@@ -7,7 +7,7 @@
  */
 
 class PotxTestCase extends DrupalWebTestCase {
-  
+
   public static function getInfo() {
     return array(
       'name' => t('Translation template extractor'),
@@ -17,8 +17,9 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   public function setUp() {
-    // Set up required modules for l10n_community.
+    // Set up required modules for potx.
     parent::setUp('locale', 'potx');
+
     // Add potx.inc which we test for its functionality.
     include_once(drupal_get_path('module', 'potx') .'/potx.inc');
     // Store empty error message for reuse in multiple cases.
@@ -44,11 +45,11 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('one more test potx permission');
     $this->assertMsgID('1 test string');
     $this->assertPluralID('@count test strings');
-    
+
     // Installer string should not appear in runtime output.
     $this->assertNoMsgID('Installer only test string');
     $this->assertMsgID('Dynamic callback test string');
-    
+
     // No context support yet.
     $this->assertNoMsgIDContext('Test string in context', 'Test context');
     $this->assertMsgID('Test string in context');
@@ -59,7 +60,7 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Dynamic callback test string');
     $this->assertNoMsgID('1 test string');
     $this->assertNoMsgID('This is a test string.');
-    
+
     $this->assert(count($this->potx_status) == 3, t('3 error messages found'));
     $this->assert($this->potx_status[0][0] == $this->empty_error, t('First empty error found.'));
     $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));
@@ -84,11 +85,15 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('one more test potx permission');
     $this->assertMsgID('1 test string');
     $this->assertPluralID('@count test strings');
-    
+    $this->assertMsgID('Test menu item description');
+    $this->assertMsgID('Test menu item description altered (1)');
+    $this->assertMsgID('Test menu item description altered (2)');
+    $this->assertMsgID('Test menu item title altered');
+
     // Installer string should not appear in runtime output.
     $this->assertNoMsgID('Installer only test string');
     $this->assertMsgID('Dynamic callback test string');
-    
+
     // No context support yet.
     $this->assertNoMsgIDContext('Test string in context', 'Test context');
     $this->assertMsgID('Test string in context');
@@ -105,7 +110,7 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));
     $this->assert($this->potx_status[2][0] == $this->empty_error, t('Third empty error found.'));
   }
-  
+
   /**
    * Test parsing of Drupal 7 module.
    */
@@ -131,10 +136,15 @@ class PotxTestCase extends DrupalWebTestCase {
 
     $this->assertMsgID('1 test string');
     $this->assertPluralID('@count test strings');
-    
+
+    $this->assertMsgID('Test menu item description');
+    $this->assertMsgID('Test menu item description altered (1)');
+    $this->assertMsgID('Test menu item description altered (2)');
+    $this->assertMsgID('Test menu item title altered');
+
     $this->assertNoMsgID('Installer only test string');
     $this->assertMsgID('Dynamic callback test string');
-    
+
     // Context support added.
     $this->assertMsgIDContext('Test string in context', 'Test context');
 
@@ -157,7 +167,7 @@ class PotxTestCase extends DrupalWebTestCase {
     // Parse and build the Drupal 6 module file.
     $filename = drupal_get_path('module', 'potx') .'/tests/potx_test_6.info';
     $this->parseFile($filename, POTX_API_6);
-    
+
     // Look for name, description and package name extracted.
     $this->assertMsgID('Translation template extractor tester');
     $this->assertMsgID('Test description');
@@ -189,7 +199,7 @@ class PotxTestCase extends DrupalWebTestCase {
   private function parseFile($filename, $api_version, $string_mode = POTX_STRING_RUNTIME) {
     global $_potx_store, $_potx_strings, $_potx_install;
     $_potx_store = $_potx_strings = $_potx_install = array();
-    
+
     potx_status('set', POTX_STATUS_STRUCTURED);
     _potx_process_file($filename, 0, '_potx_save_string', '_potx_save_version', $api_version);
     _potx_build_files($string_mode, POTX_BUILD_SINGLE, 'general', '_potx_save_string', '_potx_save_version', '_potx_get_header', NULL, NULL, $api_version);
@@ -202,7 +212,7 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->potx_status = potx_status('get', TRUE);
     //debug(var_export($this->potx_status, TRUE));
 }
-  
+
   /**
    * Helper function to assert an msgid construct in the .po file.
    */

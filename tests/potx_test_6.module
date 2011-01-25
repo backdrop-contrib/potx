@@ -19,7 +19,22 @@ function potx_test_6_menu() {
   $items['translate/test-empty'] = array(
     'title' => '',
   );
+  $items['translate/test-empty']['description'] = 'Test menu item description';
   return $items;
+}
+
+/**
+ * Implementation of hook_menu_alter()
+ */
+function potx_test_6_menu_alter(&$items) {
+  $items['translate/test-empty']['description'] = 'Test menu item description altered (1)';
+  $items['translate/test-empty'] = array_merge(
+    $items['translate/test-empty'],
+    array(
+      'title' => 'Test menu item title altered',
+      'description' => 'Test menu item description altered (2)',
+    )
+  );
 }
 
 function potx_test_6_page() {

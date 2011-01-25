@@ -219,7 +219,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
       _potx_find_perm_hook($file_name, $name_parts['filename'], $save_callback);
     }
     if ($api_version > POTX_API_5) {
-      _potx_find_menu_hook($file_name, $name_parts['filename'], $save_callback);
+      _potx_find_menu_hooks($file_name, $name_parts['filename'], $save_callback);
     }
   }
 
@@ -1083,32 +1083,57 @@ function _potx_find_context($tf, $ti, $file, $function_name) {
  * @param $save_callback
  *   Callback function used to save strings.
  */
-function _potx_find_menu_hook($file, $filebase, $save_callback) {
+function _potx_find_menu_hooks($file, $filebase, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
 
-  if (isset($_potx_lookup[$filebase .'_menu']) && is_array($_potx_lookup[$filebase .'_menu'])) {
-    // We have a menu hook in this file.
-    foreach ($_potx_lookup[$filebase .'_menu'] as $ti) {
-      $end = _potx_find_end_of_function($ti);
-      $tn = $ti;
-      while ($tn < $end) {
-        // Look through the code until the end of the function.
-        if ($_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING && in_array($_potx_tokens[$tn][1], array("'title'", '"title"', "'description'", '"description"')) && $_potx_tokens[$tn+1][0] == T_DOUBLE_ARROW) {
-          if ($_potx_tokens[$tn+2][0] == T_CONSTANT_ENCAPSED_STRING) {
-            // Menu items support no context.
-            $save_callback(
-              _potx_format_quoted_string($_potx_tokens[$tn+2][1]),
-              POTX_CONTEXT_NONE,
-              $file,
-              $_potx_tokens[$tn+2][2]
-            );
-            $tn+=2; // Jump forward by 2.
+  $hooks = array('_menu', '_menu_alter');
+  $keys = array("'title'", '"title"', "'description'", '"description"');
+
+  foreach ($hooks as $hook) {
+    if (isset($_potx_lookup[$filebase . $hook]) && is_array($_potx_lookup[$filebase . $hook])) {
+      // We have this menu hook in this file.
+      foreach ($_potx_lookup[$filebase . $hook] as $ti) {
+        $end = _potx_find_end_of_function($ti);
+        $tn = $ti;
+        while ($tn < $end) {
+
+          // Support for array syntax more commonly used in menu hooks:
+          // $items = array('node/add' => array('title' => 'Add content'));
+          if ($_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING && in_array($_potx_tokens[$tn][1], $keys) && $_potx_tokens[$tn+1][0] == T_DOUBLE_ARROW) {
+            if ($_potx_tokens[$tn+2][0] == T_CONSTANT_ENCAPSED_STRING) {
+              // We cannot export menu item context.
+              $save_callback(
+                _potx_format_quoted_string($_potx_tokens[$tn+2][1]),
+                POTX_CONTEXT_NONE,
+                $file,
+                $_potx_tokens[$tn+2][2]
+              );
+              $tn+=2; // Jump forward by 2.
+            }
+            else {
+              potx_status('error', t('Invalid menu %element definition found in %hook. Title and description keys of the menu array should be literal strings.', array('%element' => $_potx_tokens[$tn][1], '%hook' => $filebase . $hook .'()')), $file, $_potx_tokens[$tn][2], NULL, 'http://drupal.org/node/323101');
+            }
           }
-          else {
-            potx_status('error', t('Invalid menu %element definition found in %hook. Title and description keys of the menu array should be literal strings.', array('%element' => $_potx_tokens[$tn][1], '%hook' => $filebase .'_menu()')), $file, $_potx_tokens[$tn][2], NULL, 'http://drupal.org/node/323101');
+
+          // Support for array syntax more commonly used in menu alters:
+          // $items['node/add']['title'] = 'Add content here';
+          if (is_string($_potx_tokens[$tn]) && $_potx_tokens[$tn] == '[' && $_potx_tokens[$tn+1][0] == T_CONSTANT_ENCAPSED_STRING && in_array($_potx_tokens[$tn+1][1], $keys) && is_string($_potx_tokens[$tn+2]) && $_potx_tokens[$tn+2] == ']') {
+            if (is_string($_potx_tokens[$tn+3]) && $_potx_tokens[$tn+3] == '=' && $_potx_tokens[$tn+4][0] == T_CONSTANT_ENCAPSED_STRING) {
+              // We cannot export menu item context.
+              $save_callback(
+                _potx_format_quoted_string($_potx_tokens[$tn+4][1]),
+                POTX_CONTEXT_NONE,
+                $file,
+                $_potx_tokens[$tn+4][2]
+              );
+              $tn+=4; // Jump forward by 4.
+            }
+            else {
+              potx_status('error', t('Invalid menu %element definition found in %hook. Title and description keys of the menu array should be literal strings.', array('%element' => $_potx_tokens[$tn+1][1], '%hook' => $filebase . $hook .'()')), $file, $_potx_tokens[$tn+1][2], NULL, 'http://drupal.org/node/323101');
+            }
           }
+          $tn++;
         }
-        $tn++;
       }
     }
   }
