@@ -44,9 +44,12 @@ function potx_test_6_page() {
 
   st('Installer only test string');
   $t('Dynamic callback test string');
-  
+
   t('Test string in context', array(), array('context' => 'Test context'));
   t('');
+
+  st('Installer string in context', array(), array('context' => 'Installer context'));
+  $t('Dynamic string in context', array(), array('context' => 'Dynamic context'));
 }
 
 function potx_test_6_perm() {

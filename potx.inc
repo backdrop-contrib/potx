@@ -190,16 +190,18 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 
   // Regular t() calls with different usages.
   if ($api_version > POTX_API_6) {
-    // Drupal 7 onwards supports context on t().
+    // Drupal 7 onwards supports context on t() and st().
     _potx_find_t_calls_with_context($file_name, $save_callback);
+    _potx_find_t_calls_with_context($file_name, $save_callback, '$t', POTX_STRING_BOTH);
+    _potx_find_t_calls_with_context($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
   }
   else {
     _potx_find_t_calls($file_name, $save_callback);
+    _potx_find_t_calls($file_name, $save_callback, '$t', POTX_STRING_BOTH);
+    _potx_find_t_calls($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
   }
-  // These do not support context even in Drupal 7.
+  // This does not support context even in Drupal 7.
   _potx_find_t_calls($file_name, $save_callback, '_locale_import_message', POTX_STRING_BOTH);
-  _potx_find_t_calls($file_name, $save_callback, '$t', POTX_STRING_BOTH);
-  _potx_find_t_calls($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
 
   if ($api_version > POTX_API_5) {
     // Watchdog calls have both of their arguments translated from Drupal 6.x.
@@ -760,7 +762,8 @@ function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string
  *   Callback function used to save strings.
  * @param function_name
  *   The name of the function to look for (could be 't', '$t', 'st'
- *   or any other t-like function). Drupal 7 only supports context on t().
+ *   or any other t-like function). Drupal 7 only supports context on t(), st()
+ *   and $t().
  * @param $string_mode
  *   String mode to use: POTX_STRING_INSTALLER, POTX_STRING_RUNTIME or
  *   POTX_STRING_BOTH.
