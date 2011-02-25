@@ -1,4 +1,3 @@
-; $Id$
 name = Translation template extractor
 description = Provides a web interface and an API to extract translatable text from the sources of installed components.
 dependencies[] = locale

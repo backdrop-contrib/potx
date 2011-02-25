@@ -1,4 +1,3 @@
-# $Id$
 #
 # German translation of Template extractor
 # Copyright Uwe L. Korn <uwelk@xhochy.org>

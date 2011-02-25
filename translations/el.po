@@ -1,6 +1,5 @@
 # translation of el.po to Greek
 # Greek translation of potx.module
-# $Id$
 # LANGUAGE translation of Drupal (general)
 # Copyright YEAR NAME <EMAIL@ADDRESS>
 # Generated from files:

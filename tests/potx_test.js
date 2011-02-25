@@ -1,4 +1,3 @@
-/* $Id$ */
 
 /**
  * Test Drupal.t and Drupal.formatPlural() invocation.
