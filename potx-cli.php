@@ -22,7 +22,7 @@ include dirname(__FILE__) .'/potx.inc';
 // We need a lot of resources probably, so try to set memory
 // limit higher and set unlimited time for our work.
 $memory_limit = @ini_get('memory_limit');
-if ($memory_limit != '' && (int)$memory_limit < 16) {
+if ($memory_limit != '' && $memory_limit != -1 && (int)$memory_limit < 16) {
   // ini_get returns the original set value, such as "32M",
   // so we check for the int version. Before PHP 5.2, this
   // limit was less then 16M.
