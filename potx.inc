@@ -151,7 +151,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   _potx_find_version_number($code, $file_name, $version_callback);
 
   // The .info files are not PHP code, no need to tokenize.
-  if ($name_parts['extension'] == 'info' && $api_version < POTX_API_8) {
+  if ($name_parts['extension'] == 'info' && $api_version < POTX_API_8) {
     _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version);
     return;
   }
@@ -255,7 +255,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     // Applies to all Drupal versions, yay!
     _potx_add_default_region_names($file_name, $save_callback, $api_version);
   }
-  elseif ($basename == 'user.module' && $api_version < POTX_API_8) {
+  elseif ($basename == 'user.module' && $api_version < POTX_API_8) {
     // Save default user role names (up to Drupal 7).
     $save_callback('anonymous user', POTX_CONTEXT_NONE, $file_name);
     $save_callback('authenticated user', POTX_CONTEXT_NONE, $file_name);
