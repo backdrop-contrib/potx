@@ -3,3 +3,4 @@ description = Test description
 package = Test package
 version = 6.x
 core = 6.x
+hidden = TRUE
