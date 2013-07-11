@@ -107,6 +107,14 @@ define('POTX_API_6', 6);
 define('POTX_API_7', 7);
 
 /**
+ * Parse source files in Drupal 8.x format.
+ *
+ * Changes since 7.x documented at
+ * http://drupal.org/list-changes/drupal?to_branch=8.x
+ */
+define('POTX_API_8', 8);
+
+/**
  * When no context is used. Makes it easy to look these up.
  */
 define('POTX_CONTEXT_NONE', NULL);
@@ -143,7 +151,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   _potx_find_version_number($code, $file_name, $version_callback);
 
   // The .info files are not PHP code, no need to tokenize.
-  if ($name_parts['extension'] == 'info') {
+  if ($name_parts['extension'] == 'info' && $api_version < POTX_API_8) {
     _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version);
     return;
   }
@@ -189,18 +197,24 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 
   // Regular t() calls with different usages.
   if ($api_version > POTX_API_6) {
-    // Drupal 7 onwards supports context on t() and st().
+    // Drupal 7 onwards supports context on t().
     _potx_find_t_calls_with_context($file_name, $save_callback);
-    _potx_find_t_calls_with_context($file_name, $save_callback, '$t', POTX_STRING_BOTH);
-    _potx_find_t_calls_with_context($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
+    if ($api_version < POTX_API_8) {
+      // st() and $t() are supported up to Drupal 7.
+      _potx_find_t_calls_with_context($file_name, $save_callback, '$t', POTX_STRING_BOTH);
+      _potx_find_t_calls_with_context($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
+    }
   }
   else {
+    // Context-less API up to Drupal 6.
     _potx_find_t_calls($file_name, $save_callback);
     _potx_find_t_calls($file_name, $save_callback, '$t', POTX_STRING_BOTH);
     _potx_find_t_calls($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
   }
-  // This does not support context even in Drupal 7.
-  _potx_find_t_calls($file_name, $save_callback, '_locale_import_message', POTX_STRING_BOTH);
+  if ($api_version < POTX_API_8) {
+    // This does not support context even in Drupal 7.
+    _potx_find_t_calls($file_name, $save_callback, '_locale_import_message', POTX_STRING_BOTH);
+  }
 
   if ($api_version > POTX_API_5) {
     // Watchdog calls have both of their arguments translated from Drupal 6.x.
@@ -220,25 +234,29 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
       _potx_find_perm_hook($file_name, $name_parts['filename'], $save_callback);
     }
     if ($api_version > POTX_API_5) {
+      // @todo: if tabs are not defined on the menu hook anymore, exclude this for 8.
       _potx_find_menu_hooks($file_name, $name_parts['filename'], $save_callback);
     }
   }
 
   // Special handling of some Drupal core files.
-  if (($basename == 'locale.inc' && $api_version < POTX_API_7) || $basename == 'iso.inc') {
+  if ($api_version < POTX_API_8 && (($basename == 'locale.inc' && $api_version < POTX_API_7) || $basename == 'iso.inc')) {
     _potx_find_language_names($file_name, $save_callback, $api_version);
   }
   elseif ($basename == 'locale.module') {
+    // Applies to all Drupal versions, yay!
     _potx_add_date_strings($file_name, $save_callback, $api_version);
   }
   elseif ($basename == 'common.inc') {
+    // Applies to all Drupal versions, yay!
     _potx_add_format_interval_strings($file_name, $save_callback, $api_version);
   }
   elseif ($basename == 'system.module') {
+    // Applies to all Drupal versions, yay!
     _potx_add_default_region_names($file_name, $save_callback, $api_version);
   }
-  elseif ($basename == 'user.module') {
-    // Save default user role names.
+  elseif ($basename == 'user.module' && $api_version < POTX_API_8) {
+    // Save default user role names (up to Drupal 7).
     $save_callback('anonymous user', POTX_CONTEXT_NONE, $file_name);
     $save_callback('authenticated user', POTX_CONTEXT_NONE, $file_name);
     if ($api_version > POTX_API_6) {
@@ -1292,10 +1310,10 @@ function _potx_add_default_region_names($file, $save_callback, $api_version = PO
     'footer' => 'Footer',
   );
   if ($api_version > POTX_API_6) {
-    // @todo: Update with final region list when D7 stabilizes.
-    $regions['highlight'] = 'Highlighted content';
+    $regions['highlight'] = 'Highlighted';
     $regions['help'] = 'Help';
     $regions['page_top'] = 'Page top';
+    $regions['page_top'] = 'Page bottom';
   }
   foreach ($regions as $region) {
     // Regions come with the default context.
