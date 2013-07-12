@@ -159,6 +159,9 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     // @todo: D7 context support.
     _potx_parse_js_file($code, $file_name, $save_callback);
   }
+  elseif ($name_parts['extension'] == 'twig' && $api_version > POTX_API_7) {
+    _potx_parse_twig_file($code, $file_name, $save_callback);
+  }
 
   // Extract raw PHP language tokens.
   $raw_tokens = token_get_all($code);
@@ -1416,6 +1419,88 @@ function _potx_parse_js_file($code, $file, $save_callback) {
  */
 function _potx_parse_js_string($string) {
   return _potx_format_quoted_string(implode('', preg_split('~(?<!\\\\)[\'"]\s*\+\s*[\'"]~s', $string)));
+}
+
+/**
+ * Parse a Twig template for translatables. Drupal 8+.
+ *
+ * Extracts strings from Twig t filter calls and inserts them into potx
+ * storage.
+ */
+function _potx_parse_twig_file($code, $file, $save_callback) {
+  // Match the Twig t filter with single quotes: {{ 'translatable string'|t }}
+  $regex = <<<'END'
+    \{\{    # {{
+    \s*     # optional whitespace
+    (       # beginning of string
+    '       # opening single quote
+    [^'\\]* # optional regular characters (not quotes or escaped characters)
+    (?:     # an optional group of...
+    \\.     # an escaped character, plus...
+    [^'\\]* # optional regular characters (not quotes or escaped characters)
+    )*
+    '       # closing single quote
+    )       # end of string
+    \s*     # optional whitespace
+    \|      # pipe
+    \s*     # optional whitespace
+    t       # t
+    \s*     # optional whitespace
+    \}\}    # }}
+END;
+  preg_match_all('@' . $regex . '@sx', $code, $single_matches, PREG_SET_ORDER);
+
+  // Match the Twig t filter with double quotes: {{ "translatable string"|t }}
+  $regex = <<<'END'
+    \{\{    # {{
+    \s*     # optional whitespace
+    (       # beginning of string
+    "       # opening double quote
+    [^"\\]* # optional regular characters (not quotes or escaped characters)
+    (?:     # an optional group of...
+    \\.     # an escaped character, plus...
+    [^"\\]* # optional regular characters (not quotes or escaped characters)
+    )*
+    "       # closing double quote
+    )       # end of string
+    \s*     # optional whitespace
+    \|      # pipe
+    \s*     # optional whitespace
+    t       # t
+    \s*     # optional whitespace
+    \}\}    # }}
+END;
+  preg_match_all('@' . $regex . '@sx', $code, $double_matches, PREG_SET_ORDER);
+  $t_matches = array_merge($single_matches, $double_matches);
+
+  foreach ($t_matches as $match) {
+    // Remove match from code to help us identify faulty usages of the filter.
+    $code = str_replace($match[0], '', $code);
+    $save_callback(_potx_format_quoted_string($match[1]), POTX_CONTEXT_NONE, $file, 0);
+  }
+
+  // Any remaining uses of the t filter are incorrect. Identify them.
+  // This regex can be confused by strings containing, for example, "|t|",
+  // but in general strings shouldn't make it to this check, as they would have
+  // been passed through the t filter already.
+  $regex = '
+    \{\{    # {{
+    [^}]*   # anything but a closing bracket
+    \|      # pipe
+    \s*     # optional whitespace
+    t       # t
+    [\s\|]* # either whitespace or a pipe
+    [^}]*   # optional characters
+    \}\}    # }}
+  ';
+  preg_match_all('@' . $regex . '@sx', $code, $faulty_matches, PREG_SET_ORDER);
+  if (isset($faulty_matches) && count($faulty_matches)) {
+    foreach ($faulty_matches as $index => $match) {
+      $message = t('Uses of the t filter in Twig templates should start with a single literal string, and should not be chained.');
+      // TODO: Fill in specific URL for Twig documentation once it exists.
+      potx_status('error', $message, $file, NULL, $match[0], 'https://drupal.org/developing/api/localization');
+    }
+  }
 }
 
 /**

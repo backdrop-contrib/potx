@@ -183,6 +183,27 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Test parsing of Drupal 8 Twig templates.
+   */
+  public function testDrupal8Twig() {
+    $filename = drupal_get_path('module', 'potx') .'/tests/potx_test_8.html.twig';
+    $this->parseFile($filename, POTX_API_8);
+
+    $this->assertMsgID('This is a translated string.');
+    $this->assertMsgID('A double-quoted string');
+    $this->assertMsgID('Here\'s a double-quoted "and escaped" string.');
+    $this->assertMsgID("Here's a string with an escaped quote.");
+
+    $this->assertNoMsgID('This is a concatenated string that should not be picked up.');
+    $this->assertNoMsgID('This is a concatenated string ');
+    $this->assertNoMsgID('that should not be picked up.');
+    $this->assertNoMsgID('This is an untranslated string.');
+
+    $this->assert(count($this->potx_status) == 1, t('1 error message found'));
+    $this->assert($this->potx_status[0][0] == t('Uses of the t filter in Twig templates should start with a single literal string, and should not be chained.'), t('Concatenation error found.'));
+  }
+
+  /**
    * Test parsing of Drupal 6 info file. Drupal 5 and 7 have no other rules.
    */
   public function testDrupalInfo() {
