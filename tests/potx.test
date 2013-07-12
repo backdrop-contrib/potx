@@ -247,8 +247,12 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Test string in JS');
     $this->assertPluralID('1 test string in JS', '@count test strings in JS');
     $this->assertMsgID('Another test string in JS');
-    $this->assertMsgID('Embedded test string in JS');
     $this->assertMsgID('String with @placeholder value');
+    $this->assertMsgIDContext('Test string in JS in test context', 'Test context');
+    $this->assertMsgIDContext('Test string in JS in context and with @placeholder', 'Test context');
+
+    $this->assertPluralIDContext('1 test string in JS in test context', '@count test strings in JS in test context', 'Test context');
+    $this->assertPluralIDContext('1 test string in JS with context and @placeholder', '@count test strings in JS with context and @placeholder', 'Test context');
 
     $this->assert(count($this->potx_status) == 1, t('1 error message found'));
     $this->assert($this->potx_status[0][0] == $this->empty_error, t('Empty error found.'));

@@ -125,6 +125,42 @@ define('POTX_CONTEXT_NONE', NULL);
 define('POTX_CONTEXT_ERROR', FALSE);
 
 /**
+ * Regular expression pattern used to localize JavaScript strings.
+ */
+define('POTX_JS_STRING', '(?:(?:\'(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+');
+
+/**
+ * Regular expression pattern used to match simple JS object literal.
+ *
+ * This pattern matches a basic JS object, but will fail on an object with
+ * nested objects. Used in JS file parsing for string arg processing.
+ */
+define('POTX_JS_OBJECT', '\{.*?\}');
+
+
+/**
+ * Regular expression to match an object containing a key 'context'.
+ *
+ * Pattern to match a JS object containing a 'context key' with a string value,
+ * which is captured. Will fail if there are nested objects.
+ */
+define('POTX_JS_OBJECT_CONTEXT', '
+  \{              # match object literal start
+  .*?             # match anything, non-greedy
+  (?:             # match a form of "context"
+    \'context\'
+    |
+    "context"
+    |
+    context
+  )
+  \s*:\s*         # match key-value separator ":"
+  (' . POTX_JS_STRING . ')  # match context string
+  .*?             # match anything, non-greedy
+  \}              # match end of object literal
+');
+
+/**
  * Process a file and put extracted information to the given parameters.
  *
  * @param $file_path
@@ -1379,31 +1415,90 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $a
  * Regex code lifted from _locale_parse_js_file().
  */
 function _potx_parse_js_file($code, $file, $save_callback) {
-  $js_string_regex = '(?:(?:\'(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+';
-
   // Match all calls to Drupal.t() in an array.
   // Note: \s also matches newlines with the 's' modifier.
-  preg_match_all('~[^\w]Drupal\s*\.\s*t\s*\(\s*('. $js_string_regex .')\s*[,\)]~s', $code, $t_matches, PREG_SET_ORDER);
+  preg_match_all('~
+    [^\w]Drupal\s*\.\s*t\s*                     # match "Drupal.t" with whitespace
+    \(\s*                                       # match "(" argument list start
+    (' . POTX_JS_STRING . ')\s*                 # capture string argument
+    (?:,\s*' . POTX_JS_OBJECT . '\s*            # optionally capture str args
+      (?:,\s*' . POTX_JS_OBJECT_CONTEXT . '\s*) # optionally capture context
+    ?)?                                         # close optional args
+    [\)]                                        # match ")" or "," to finish
+    ~sx', $code, $t_matches, PREG_SET_ORDER);
+
+  // Add strings from Drupal.t().
   if (isset($t_matches) && count($t_matches)) {
     foreach ($t_matches as $match) {
       // Remove match from code to help us identify faulty Drupal.t() calls.
       $code = str_replace($match[0], '', $code);
-      // @todo: figure out how to parse out context, once Drupal supports it.
-      $save_callback(_potx_parse_js_string($match[1]), POTX_CONTEXT_NONE, $file, 0);
+      debug($match);
+
+      // Get context
+      if (!empty($match[2])) {
+        // Remove wrapping quotes
+        $context = preg_replace('~^[\'"]|[\'"]$~', '', $match[2]);
+        $context = _potx_parse_js_string($match[2]);
+      }
+      else {
+        // Set context to null
+        $context = POTX_CONTEXT_NONE;
+      }
+
+      $save_callback(_potx_parse_js_string($match[1]), $context, $file, 0);
     }
   }
 
   // Match all Drupal.formatPlural() calls in another array.
-  preg_match_all('~[^\w]Drupal\s*\.\s*formatPlural\s*\(\s*.+?\s*,\s*('. $js_string_regex .')\s*,\s*((?:(?:\'(?:\\\\\'|[^\'])*@count(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*@count(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+)\s*[,\)]~s', $code, $plural_matches, PREG_SET_ORDER);
+  preg_match_all('~
+    [^\w]Drupal\s*\.\s*formatPlural\s*  # match "Drupal.formatPlural" with whitespace
+    \(                                  # match "(" argument list start
+    \s*.+?\s*,\s*                       # match count argument
+    (' . POTX_JS_STRING . ')\s*,\s*     # match singular string argument
+    (                                   # capture plural string argument
+      (?:                               # non-capturing group to repeat string pieces
+        (?:
+          \'                            # match start of single-quoted string
+          (?:\\\\\'|[^\'])*             # match any character except unescaped single-quote
+          @count                        # match "@count"
+          (?:\\\\\'|[^\'])*             # match any character except unescaped single-quote
+          \'                            # match end of single-quoted string
+          |
+          "                             # match start of double-quoted string
+          (?:\\\\"|[^"])*               # match any character except unescaped double-quote
+          @count                        # match "@count"
+          (?:\\\\"|[^"])*               # match any character except unescaped double-quote
+          "                             # match end of double-quoted string
+        )
+        (?:\s*\+\s*)?                   # match "+" with possible whitespace, for str concat
+      )+                                # match multiple because we supports concatenating strs
+    )\s*                                # end capturing of plural string argument
+    (?:,\s*' . POTX_JS_OBJECT . '\s*              # optionally capture string args
+      (?:,\s*' . POTX_JS_OBJECT_CONTEXT . '\s*)?  # optionally capture context
+    )?
+    [\)]
+    ~sx', $code, $plural_matches, PREG_SET_ORDER);
+
   if (isset($plural_matches) && count($plural_matches)) {
     foreach ($plural_matches as $index => $match) {
       // Remove match from code to help us identify faulty
       // Drupal.formatPlural() calls later.
       $code = str_replace($match[0], '', $code);
-      // @todo: figure out how to parse out context, once Drupal supports it.
+
+      // Get context
+      if (!empty($match[3])) {
+        // Remove wrapping quotes
+        $context = preg_replace('~^[\'"]|[\'"]$~', '', $match[3]);
+        $context = _potx_parse_js_string($match[3]);
+      }
+      else {
+        // Set context to null
+        $context = POTX_CONTEXT_NONE;
+      }
+
       $save_callback(
         _potx_parse_js_string($match[1]) ."\0". _potx_parse_js_string($match[2]),
-        POTX_CONTEXT_NONE,
+        $context,
         $file,
         0
       );
