@@ -74,6 +74,8 @@ function potx_drush_extract($mode = NULL) {
     // First argument could be any of the mode names.
     $build_mode = constant('POTX_BUILD_'. strtoupper($mode));
   }
+  // Silence error message reporting. Messages will be reported by at the end.
+  potx_status('set', POTX_STATUS_SILENT);
 
   // Get Drush options.
   $modules_option = drush_get_option('modules');
@@ -102,12 +104,36 @@ function potx_drush_extract($mode = NULL) {
   }
 
   foreach ($files as $file) {
-    drush_print("Processing $file...");
+    drush_print(dt("Processing $file..."));
     _potx_process_file($file, 0, '_potx_save_string', '_potx_save_version', $api_option);
   }
 
   _potx_build_files(POTX_STRING_RUNTIME, $build_mode);
   _potx_build_files(POTX_STRING_INSTALLER, POTX_BUILD_SINGLE, 'installer');
   _potx_write_files();
-  drush_print("Done.");
+
+  drush_print("");
+  drush_print(dt("Stats"));
+  $header = array(
+    'files' => dt('Files'),
+    'strings' => dt('Strings'),
+    'warnings' => dt('Warnings'),
+  );
+  $rows = array(array_values($header));
+  // Get errors, if any.
+  $errors = potx_status('get');
+  // Get saved strings.
+  $strings = _potx_save_string(NULL,  NULL, NULL, 0, POTX_STRING_RUNTIME);
+  $rows[] = array(count($files), count($strings), count($errors));
+  drush_print_table($rows, TRUE);
+
+  if (!empty($errors)) {
+    drush_print(dt("Errors"));
+    foreach ($errors as $error) {
+      drush_set_error($error);
+    }
+  }
+
+  drush_print("");
+  drush_print(dt("Done"));
 }
