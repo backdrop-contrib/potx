@@ -1,0 +1,34 @@
+# Test schema for configuration files.
+
+test.settings:
+  type: mapping
+  label: 'Test settings'
+  mapping:
+    label:
+      type: label
+      label: 'Label'
+    test_string:
+      type: string
+      label: 'Test string with "quotes"'
+    test_bool:
+      type: boolean
+      label: 'Test boolean'
+    test_integer:
+      type: integer
+      label: 'Test integer'
+    test_sequence:
+      type: sequence
+      label: 'Test sequence'
+      sequence:
+        - type: sequence
+          label: 'Test sequence 2'
+          sequence:
+            - type: string
+              label: 'Test string 2'
+    test_mapping:
+      type: mapping
+      label: 'Test mapping'
+      mapping:
+        type:
+          type: string
+          label: 'Test string 3'

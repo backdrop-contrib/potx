@@ -1680,6 +1680,25 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
   if (substr($file_name, -9) === '.info.yml') {
     _potx_find_info_yml_file_strings($code, $file_name, $save_callback);
   }
+  // Handle configuration schema files, found in config/schema directories.
+  elseif (preg_match('~config/schema/[^/]+\.schema\.yml$~', $file_name)) {
+    $schema = Yaml::parse($code);
+    _potx_find_config_schema_labels($schema, $file_name, $save_callback);
+  }
+}
+
+/**
+ * Recursively extract 'label' values from a configuration schema array.
+ */
+function _potx_find_config_schema_labels($schema, $file_name, $save_callback) {
+  foreach ($schema as $key => $value) {
+    if (is_array($value)) {
+      _potx_find_config_schema_labels($value, $file_name, $save_callback);
+    }
+    elseif ($key == 'label') {
+      $save_callback(addcslashes($value, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+    }
+  }
 }
 
 /**

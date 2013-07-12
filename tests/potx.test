@@ -242,6 +242,30 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Test parsing of Drupal 8 configuration schema files.
+   */
+  public function testDrupal8ConfigurationSchema() {
+    $filename = drupal_get_path('module', 'potx') .'/tests/drupal8/config/schema/test.schema.yml';
+    $this->parseFile($filename, POTX_API_8);
+
+    // Make sure all the 'label' strings are extracted.
+    $this->assertMsgID('Label');
+    $this->assertMsgID('Test settings');
+    $this->assertMsgID('Test string with "quotes"');
+    $this->assertMsgID('Test boolean');
+    $this->assertMsgID('Test integer');
+    $this->assertMsgID('Test sequence');
+    $this->assertMsgID('Test sequence 2');
+    $this->assertMsgID('Test string 2');
+    $this->assertMsgID('Test mapping');
+    $this->assertMsgID('Test string 3');
+
+    // Make sure other strings are not extracted.
+    $this->assertNoMsgID('mapping');
+    $this->assertNoMsgID('sequence');
+  }
+
+  /**
    * Test parsing of Drupal 6 info file. Drupal 5 and 7 have no other rules.
    */
   public function testDrupalInfo() {
