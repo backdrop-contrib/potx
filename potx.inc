@@ -290,6 +290,9 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   if ($api_version < POTX_API_8 && (($basename == 'locale.inc' && $api_version < POTX_API_7) || $basename == 'iso.inc')) {
     _potx_find_language_names($file_name, $save_callback, $api_version);
   }
+  elseif ($api_version > POTX_API_7 && $basename == 'LanguageManager.php') {
+    _potx_find_language_names($file_name, $save_callback, $api_version);
+  }
   elseif ($basename == 'locale.module') {
     // Applies to all Drupal versions, yay!
     _potx_add_date_strings($file_name, $save_callback, $api_version);
@@ -1220,7 +1223,17 @@ function _potx_find_menu_hooks($file, $filebase, $save_callback) {
 function _potx_find_language_names($file, $save_callback, $api_version = POTX_API_CURRENT) {
   global $_potx_tokens, $_potx_lookup;
 
-  foreach ($_potx_lookup[$api_version > POTX_API_5 ? '_locale_get_predefined_list' : '_locale_get_iso639_list'] as $ti) {
+  if ($api_version > POTX_API_7) {
+    $key = 'getStandardLanguageList';
+  }
+  elseif ($api_version > POTX_API_5) {
+    $key = '_locale_get_predefined_list';
+  }
+  else {
+    $key = '_locale_get_iso639_list';
+  }
+
+  foreach ($_potx_lookup[$key] as $ti) {
     // Search for the definition of _locale_get_predefined_list(), not where it is called.
     if ($_potx_tokens[$ti-1][0] == T_FUNCTION) {
       break;
@@ -1432,7 +1445,6 @@ function _potx_parse_js_file($code, $file, $save_callback) {
     foreach ($t_matches as $match) {
       // Remove match from code to help us identify faulty Drupal.t() calls.
       $code = str_replace($match[0], '', $code);
-      debug($match);
 
       // Get context
       if (!empty($match[2])) {

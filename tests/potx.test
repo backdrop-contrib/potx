@@ -182,6 +182,13 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));
   }
 
+  public function testDrupal8LanguageManager() {
+    $filename = drupal_get_path('module', 'potx') .'/tests/LanguageManager.php';
+    $this->parseFile($filename, POTX_API_8);
+
+    $this->assertMsgID('Test English language');
+  }
+
   /**
    * Test parsing of Drupal 8 Twig templates.
    */
@@ -246,7 +253,6 @@ class PotxTestCase extends DrupalWebTestCase {
     // Assert strings found in JS source code.
     $this->assertMsgID('Test string in JS');
     $this->assertPluralID('1 test string in JS', '@count test strings in JS');
-    $this->assertMsgID('Another test string in JS');
     $this->assertMsgID('String with @placeholder value');
     $this->assertMsgIDContext('Test string in JS in test context', 'Test context');
     $this->assertMsgIDContext('Test string in JS in context and with @placeholder', 'Test context');
