@@ -1691,7 +1691,7 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   $dirs = glob($path .'*', GLOB_ONLYDIR);
   if (is_array($dirs)) {
     foreach ($dirs as $dir) {
-      if (!preg_match("!(^|.+/)(CVS|\.svn|\.git|tests)$!", $dir)) {
+      if (!preg_match("!(^|.+/)(CVS|\.svn|\.git|tests|vendor)$!", $dir)) {
         $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
       }
     }
