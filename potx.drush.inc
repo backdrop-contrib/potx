@@ -103,7 +103,7 @@ function potx_drush_extract($mode = NULL) {
 
   foreach ($files as $file) {
     drush_print("Processing $file...");
-    _potx_process_file($file);
+    _potx_process_file($file, 0, '_potx_save_string', '_potx_save_version', $api_option);
   }
 
   _potx_build_files(POTX_STRING_RUNTIME, $build_mode);

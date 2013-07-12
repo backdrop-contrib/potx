@@ -178,11 +178,14 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
       if (is_array($token)) {
         $token[] = $line_number;
          // Fill array for finding token offsets quickly.
-         if ($token[0] == T_STRING || ($token[0] == T_VARIABLE && $token[1] == '$t')) {
-           if (!isset($_potx_lookup[$token[1]])) {
-             $_potx_lookup[$token[1]] = array();
+         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t')) {
+
+           // Give doc comments a specific key because their content varies.
+           $key = ($token[0] == T_DOC_COMMENT) ? 'T_DOC_COMMENT' : $token[1];
+           if (!isset($_potx_lookup[$key])) {
+             $_potx_lookup[$key] = array();
            }
-           $_potx_lookup[$token[1]][] = $token_number;
+           $_potx_lookup[$key][] = $token_number;
          }
       }
       $_potx_tokens[] = $token;
@@ -240,6 +243,11 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
       // @todo: if tabs are not defined on the menu hook anymore, exclude this for 8.
       _potx_find_menu_hooks($file_name, $name_parts['filename'], $save_callback);
     }
+  }
+
+  // Support @Translation annotation (in doc comments) on Drupal 8+.
+  if ($api_version > POTX_API_7) {
+    _potx_find_translation_annotations($file_name, $save_callback);
   }
 
   // Special handling of some Drupal core files.
@@ -1499,6 +1507,47 @@ END;
       $message = t('Uses of the t filter in Twig templates should start with a single literal string, and should not be chained.');
       // TODO: Fill in specific URL for Twig documentation once it exists.
       potx_status('error', $message, $file, NULL, $match[0], 'https://drupal.org/developing/api/localization');
+    }
+  }
+}
+
+/**
+ * Detect all occurances of @Translation annotations in doc comments.
+ *
+ * @param $file
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ */
+function _potx_find_translation_annotations($file, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  if (isset($_potx_lookup['T_DOC_COMMENT'])) {
+    foreach ($_potx_lookup['T_DOC_COMMENT'] as $ti) {
+      list($type, $string, $line) = $_potx_tokens[$ti];
+      // Match for a possible empty string too, so we can signal that kind of
+      // error in our standard way (from the save callback), instead of signaling
+      // a generic error from here around syntax.
+      preg_match_all('!@Translation\("(.*)"\)!', $string, $found);
+      if (isset($found) && is_array($found) && count($found[1])) {
+        foreach ($found[1] as $index => $match) {
+          $save_callback(
+            $match,
+            POTX_CONTEXT_NONE,
+            $file,
+            $line
+          );
+          // Remove this annotation from the comment. This way if we have any
+          // left after this foreach, we have bugos ones left and can use that
+          // to signal an error.
+          $string = str_replace($found[0][$index], '', $string);
+        }
+      }
+      if (strpos($string, '@Translation')) {
+        // @Translation annotations still exist, so we have ones that did not
+        // match the expected pattern.
+        _potx_marker_error($file, $line, "@Translation", $ti, t('In @Translation, only one, non-empty static string is allowed in double quotes.'), 'https://drupal.org/node/1882526');
+      }
     }
   }
 }
