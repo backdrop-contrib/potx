@@ -3,3 +3,4 @@ description = Provides a web interface and an API to extract translatable text f
 dependencies[] = locale
 core = 6.x
 package = Multilingual
+php = 5.1.2

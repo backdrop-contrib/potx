@@ -229,6 +229,19 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Test parsing of Drupal 8 .info.yml files.
+   */
+  public function testDrupal8InfoYml() {
+    $filename = drupal_get_path('module', 'potx') .'/tests/potx_test_8.info.yml';
+    $this->parseFile($filename, POTX_API_8);
+
+    // Look for name, description and package name extracted.
+    $this->assertMsgID('Translation template extractor tester');
+    $this->assertMsgID('Test description');
+    $this->assertMsgID('Test package');
+  }
+
+  /**
    * Test parsing of Drupal 6 info file. Drupal 5 and 7 have no other rules.
    */
   public function testDrupalInfo() {

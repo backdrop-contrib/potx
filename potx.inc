@@ -22,6 +22,16 @@
  */
 
 /**
+ * Use the Symfony YAML parser, found in the vendor directory.
+ */
+set_include_path(get_include_path() . PATH_SEPARATOR . __DIR__ . '/vendor');
+spl_autoload_register(function($c){
+  @include preg_replace('#\\\|_(?!.*\\\)#','/',$c).'.php';
+});
+
+use Symfony\Component\Yaml\Yaml;
+
+/**
  * The current Drupal major API verion.
  *
  * This should be the only difference between different branches of potx.inc
@@ -190,6 +200,9 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   if ($name_parts['extension'] == 'info' && $api_version < POTX_API_8) {
     _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version);
     return;
+  }
+  elseif ($name_parts['extension'] == 'yml' && $api_version > POTX_API_7) {
+    _potx_parse_yaml_file($code, $file_name, $save_callback);
   }
   elseif ($name_parts['extension'] == 'js' && $api_version > POTX_API_5) {
     // @todo: D7 context support.
@@ -1655,6 +1668,41 @@ function _potx_find_translation_annotations($file, $save_callback) {
         // match the expected pattern.
         _potx_marker_error($file, $line, "@Translation", $ti, t('In @Translation, only one, non-empty static string is allowed in double quotes.'), 'https://drupal.org/node/1882526');
       }
+    }
+  }
+}
+
+/**
+ * Parse a YAML file for translatables. Drupal 8+.
+ */
+function _potx_parse_yaml_file($code, $file_name, $save_callback) {
+  // Handle .info.yml files.
+  if (substr($file_name, -9) === '.info.yml') {
+    _potx_find_info_yml_file_strings($code, $file_name, $save_callback);
+  }
+}
+
+/**
+ * Parse a .info.yml file and add relevant strings to the list.
+ */
+function _potx_find_info_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
+  $info = Yaml::parse($code);
+
+  // We need the name, description and package values. Others,
+  // like core and PHP compatibility, timestamps or versions
+  // are not to be translated.
+  foreach (array('name', 'description', 'package') as $key) {
+    if (isset($info[$key])) {
+      // No context support for .info.yml file strings.
+      $save_callback(addcslashes($info[$key], "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+    }
+  }
+
+  // Add region names from themes.
+  if (isset($info['regions']) && is_array($info['regions'])) {
+    foreach ($info['regions'] as $region => $region_name) {
+      // No context support for .info.yml file strings.
+      $save_callback(addcslashes($region_name, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
     }
   }
 }
