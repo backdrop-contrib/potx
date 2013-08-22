@@ -223,6 +223,11 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Another good translation annotation');
     $this->assertMsgID('Final good translation annotation');
 
+    $this->assertNoMsgIDContext('Good translation annotation', 'Translation test');
+
+    $this->assertMsgID('Translation in good context');
+    $this->assertMsgIDContext('Translation in good context', 'Translation test');
+
     $this->assert(count($this->potx_status) == 2, t('2 error messages found'));
     $this->assert($this->potx_status[0][0] == 'In @Translation, only one, non-empty static string is allowed in double quotes.', t('Incorrect @Translation found.'));
     $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));

@@ -1648,12 +1648,15 @@ function _potx_find_translation_annotations($file, $save_callback) {
       // Match for a possible empty string too, so we can signal that kind of
       // error in our standard way (from the save callback), instead of signaling
       // a generic error from here around syntax.
-      preg_match_all('!@Translation\("(.*)"\)!', $string, $found);
+      preg_match_all('!@Translation\(\s*"([^"]*)"(\s*,\s*context\s*=\s*("[^"]+"))?\s*\)!', $string, $found);
       if (isset($found) && is_array($found) && count($found[1])) {
+
         foreach ($found[1] as $index => $match) {
+          $context = empty($found[3][$index]) ? POTX_CONTEXT_NONE : trim($found[3][$index], '"');
+
           $save_callback(
             $match,
-            POTX_CONTEXT_NONE,
+            $context,
             $file,
             $line
           );

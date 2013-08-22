@@ -10,6 +10,7 @@
  * annotations really.
  *
  * @Translation("Good translation annotation")
+ * @Translation("Translation in good context", context="Translation test")
  */
 function potx_test_8_example() {
 }
