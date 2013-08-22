@@ -1,0 +1,20 @@
+{#
+/**
+ * @file
+ * A test Twig template for potx.
+ */
+#}
+<div id="test">
+  {% if variable %}
+    <span>{{ variable }}</span>
+    {{ 'This is a translated string.'|t }}
+  {% endif %}
+</div>
+
+<div>{{ 'Here\'s a string with an escaped quote.'|t }}</div>
+<div>{{ "A double-quoted string"|t }}</div>
+<div>{{ "Here's a double-quoted \"and escaped\" string."|t }}</div>
+
+{{ 'This is a concatenated string ' . 'that should not be picked up.'|t }}
+{{ 'This is an untranslated string.' }}
+

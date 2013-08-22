@@ -22,6 +22,16 @@
  */
 
 /**
+ * Use the Symfony YAML parser, found in the vendor directory.
+ */
+set_include_path(get_include_path() . PATH_SEPARATOR . __DIR__ . '/vendor');
+spl_autoload_register(function($c){
+  @include preg_replace('#\\\|_(?!.*\\\)#','/',$c).'.php';
+});
+
+use Symfony\Component\Yaml\Yaml;
+
+/**
  * The current Drupal major API verion.
  *
  * This should be the only difference between different branches of potx.inc
@@ -125,6 +135,42 @@ define('POTX_CONTEXT_NONE', NULL);
 define('POTX_CONTEXT_ERROR', FALSE);
 
 /**
+ * Regular expression pattern used to localize JavaScript strings.
+ */
+define('POTX_JS_STRING', '(?:(?:\'(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+');
+
+/**
+ * Regular expression pattern used to match simple JS object literal.
+ *
+ * This pattern matches a basic JS object, but will fail on an object with
+ * nested objects. Used in JS file parsing for string arg processing.
+ */
+define('POTX_JS_OBJECT', '\{.*?\}');
+
+
+/**
+ * Regular expression to match an object containing a key 'context'.
+ *
+ * Pattern to match a JS object containing a 'context key' with a string value,
+ * which is captured. Will fail if there are nested objects.
+ */
+define('POTX_JS_OBJECT_CONTEXT', '
+  \{              # match object literal start
+  .*?             # match anything, non-greedy
+  (?:             # match a form of "context"
+    \'context\'
+    |
+    "context"
+    |
+    context
+  )
+  \s*:\s*         # match key-value separator ":"
+  (' . POTX_JS_STRING . ')  # match context string
+  .*?             # match anything, non-greedy
+  \}              # match end of object literal
+');
+
+/**
  * Process a file and put extracted information to the given parameters.
  *
  * @param $file_path
@@ -151,13 +197,19 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   _potx_find_version_number($code, $file_name, $version_callback);
 
   // The .info files are not PHP code, no need to tokenize.
-  if ($name_parts['extension'] == 'info' && $api_version < POTX_API_8) {
+  if ($name_parts['extension'] == 'info' && $api_version < POTX_API_8) {
     _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version);
     return;
+  }
+  elseif ($name_parts['extension'] == 'yml' && $api_version > POTX_API_7) {
+    _potx_parse_yaml_file($code, $file_name, $save_callback);
   }
   elseif ($name_parts['extension'] == 'js' && $api_version > POTX_API_5) {
     // @todo: D7 context support.
     _potx_parse_js_file($code, $file_name, $save_callback);
+  }
+  elseif ($name_parts['extension'] == 'twig' && $api_version > POTX_API_7) {
+    _potx_parse_twig_file($code, $file_name, $save_callback);
   }
 
   // Extract raw PHP language tokens.
@@ -175,11 +227,14 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
       if (is_array($token)) {
         $token[] = $line_number;
          // Fill array for finding token offsets quickly.
-         if ($token[0] == T_STRING || ($token[0] == T_VARIABLE && $token[1] == '$t')) {
-           if (!isset($_potx_lookup[$token[1]])) {
-             $_potx_lookup[$token[1]] = array();
+         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t')) {
+
+           // Give doc comments a specific key because their content varies.
+           $key = ($token[0] == T_DOC_COMMENT) ? 'T_DOC_COMMENT' : $token[1];
+           if (!isset($_potx_lookup[$key])) {
+             $_potx_lookup[$key] = array();
            }
-           $_potx_lookup[$token[1]][] = $token_number;
+           $_potx_lookup[$key][] = $token_number;
          }
       }
       $_potx_tokens[] = $token;
@@ -239,8 +294,16 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     }
   }
 
+  // Support @Translation annotation (in doc comments) on Drupal 8+.
+  if ($api_version > POTX_API_7) {
+    _potx_find_translation_annotations($file_name, $save_callback);
+  }
+
   // Special handling of some Drupal core files.
   if ($api_version < POTX_API_8 && (($basename == 'locale.inc' && $api_version < POTX_API_7) || $basename == 'iso.inc')) {
+    _potx_find_language_names($file_name, $save_callback, $api_version);
+  }
+  elseif ($api_version > POTX_API_7 && $basename == 'LanguageManager.php') {
     _potx_find_language_names($file_name, $save_callback, $api_version);
   }
   elseif ($basename == 'locale.module') {
@@ -255,7 +318,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     // Applies to all Drupal versions, yay!
     _potx_add_default_region_names($file_name, $save_callback, $api_version);
   }
-  elseif ($basename == 'user.module' && $api_version < POTX_API_8) {
+  elseif ($basename == 'user.module' && $api_version < POTX_API_8) {
     // Save default user role names (up to Drupal 7).
     $save_callback('anonymous user', POTX_CONTEXT_NONE, $file_name);
     $save_callback('authenticated user', POTX_CONTEXT_NONE, $file_name);
@@ -1173,7 +1236,17 @@ function _potx_find_menu_hooks($file, $filebase, $save_callback) {
 function _potx_find_language_names($file, $save_callback, $api_version = POTX_API_CURRENT) {
   global $_potx_tokens, $_potx_lookup;
 
-  foreach ($_potx_lookup[$api_version > POTX_API_5 ? '_locale_get_predefined_list' : '_locale_get_iso639_list'] as $ti) {
+  if ($api_version > POTX_API_7) {
+    $key = 'getStandardLanguageList';
+  }
+  elseif ($api_version > POTX_API_5) {
+    $key = '_locale_get_predefined_list';
+  }
+  else {
+    $key = '_locale_get_iso639_list';
+  }
+
+  foreach ($_potx_lookup[$key] as $ti) {
     // Search for the definition of _locale_get_predefined_list(), not where it is called.
     if ($_potx_tokens[$ti-1][0] == T_FUNCTION) {
       break;
@@ -1368,31 +1441,89 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $a
  * Regex code lifted from _locale_parse_js_file().
  */
 function _potx_parse_js_file($code, $file, $save_callback) {
-  $js_string_regex = '(?:(?:\'(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+';
-
   // Match all calls to Drupal.t() in an array.
   // Note: \s also matches newlines with the 's' modifier.
-  preg_match_all('~[^\w]Drupal\s*\.\s*t\s*\(\s*('. $js_string_regex .')\s*[,\)]~s', $code, $t_matches, PREG_SET_ORDER);
+  preg_match_all('~
+    [^\w]Drupal\s*\.\s*t\s*                     # match "Drupal.t" with whitespace
+    \(\s*                                       # match "(" argument list start
+    (' . POTX_JS_STRING . ')\s*                 # capture string argument
+    (?:,\s*' . POTX_JS_OBJECT . '\s*            # optionally capture str args
+      (?:,\s*' . POTX_JS_OBJECT_CONTEXT . '\s*) # optionally capture context
+    ?)?                                         # close optional args
+    [\)]                                        # match ")" or "," to finish
+    ~sx', $code, $t_matches, PREG_SET_ORDER);
+
+  // Add strings from Drupal.t().
   if (isset($t_matches) && count($t_matches)) {
     foreach ($t_matches as $match) {
       // Remove match from code to help us identify faulty Drupal.t() calls.
       $code = str_replace($match[0], '', $code);
-      // @todo: figure out how to parse out context, once Drupal supports it.
-      $save_callback(_potx_parse_js_string($match[1]), POTX_CONTEXT_NONE, $file, 0);
+
+      // Get context
+      if (!empty($match[2])) {
+        // Remove wrapping quotes
+        $context = preg_replace('~^[\'"]|[\'"]$~', '', $match[2]);
+        $context = _potx_parse_js_string($match[2]);
+      }
+      else {
+        // Set context to null
+        $context = POTX_CONTEXT_NONE;
+      }
+
+      $save_callback(_potx_parse_js_string($match[1]), $context, $file, 0);
     }
   }
 
   // Match all Drupal.formatPlural() calls in another array.
-  preg_match_all('~[^\w]Drupal\s*\.\s*formatPlural\s*\(\s*.+?\s*,\s*('. $js_string_regex .')\s*,\s*((?:(?:\'(?:\\\\\'|[^\'])*@count(?:\\\\\'|[^\'])*\'|"(?:\\\\"|[^"])*@count(?:\\\\"|[^"])*")(?:\s*\+\s*)?)+)\s*[,\)]~s', $code, $plural_matches, PREG_SET_ORDER);
+  preg_match_all('~
+    [^\w]Drupal\s*\.\s*formatPlural\s*  # match "Drupal.formatPlural" with whitespace
+    \(                                  # match "(" argument list start
+    \s*.+?\s*,\s*                       # match count argument
+    (' . POTX_JS_STRING . ')\s*,\s*     # match singular string argument
+    (                                   # capture plural string argument
+      (?:                               # non-capturing group to repeat string pieces
+        (?:
+          \'                            # match start of single-quoted string
+          (?:\\\\\'|[^\'])*             # match any character except unescaped single-quote
+          @count                        # match "@count"
+          (?:\\\\\'|[^\'])*             # match any character except unescaped single-quote
+          \'                            # match end of single-quoted string
+          |
+          "                             # match start of double-quoted string
+          (?:\\\\"|[^"])*               # match any character except unescaped double-quote
+          @count                        # match "@count"
+          (?:\\\\"|[^"])*               # match any character except unescaped double-quote
+          "                             # match end of double-quoted string
+        )
+        (?:\s*\+\s*)?                   # match "+" with possible whitespace, for str concat
+      )+                                # match multiple because we supports concatenating strs
+    )\s*                                # end capturing of plural string argument
+    (?:,\s*' . POTX_JS_OBJECT . '\s*              # optionally capture string args
+      (?:,\s*' . POTX_JS_OBJECT_CONTEXT . '\s*)?  # optionally capture context
+    )?
+    [\)]
+    ~sx', $code, $plural_matches, PREG_SET_ORDER);
+
   if (isset($plural_matches) && count($plural_matches)) {
     foreach ($plural_matches as $index => $match) {
       // Remove match from code to help us identify faulty
       // Drupal.formatPlural() calls later.
       $code = str_replace($match[0], '', $code);
-      // @todo: figure out how to parse out context, once Drupal supports it.
+
+      // Get context
+      if (!empty($match[3])) {
+        // Remove wrapping quotes
+        $context = preg_replace('~^[\'"]|[\'"]$~', '', $match[3]);
+        $context = _potx_parse_js_string($match[3]);
+      }
+      else {
+        // Set context to null
+        $context = POTX_CONTEXT_NONE;
+      }
+
       $save_callback(
         _potx_parse_js_string($match[1]) ."\0". _potx_parse_js_string($match[2]),
-        POTX_CONTEXT_NONE,
+        $context,
         $file,
         0
       );
@@ -1416,6 +1547,183 @@ function _potx_parse_js_file($code, $file, $save_callback) {
  */
 function _potx_parse_js_string($string) {
   return _potx_format_quoted_string(implode('', preg_split('~(?<!\\\\)[\'"]\s*\+\s*[\'"]~s', $string)));
+}
+
+/**
+ * Parse a Twig template for translatables. Drupal 8+.
+ *
+ * Extracts strings from Twig t filter calls and inserts them into potx
+ * storage.
+ */
+function _potx_parse_twig_file($code, $file, $save_callback) {
+  // Match the Twig t filter with single quotes: {{ 'translatable string'|t }}
+  $regex = <<<'END'
+    \{\{    # {{
+    \s*     # optional whitespace
+    (       # beginning of string
+    '       # opening single quote
+    [^'\\]* # optional regular characters (not quotes or escaped characters)
+    (?:     # an optional group of...
+    \\.     # an escaped character, plus...
+    [^'\\]* # optional regular characters (not quotes or escaped characters)
+    )*
+    '       # closing single quote
+    )       # end of string
+    \s*     # optional whitespace
+    \|      # pipe
+    \s*     # optional whitespace
+    t       # t
+    \s*     # optional whitespace
+    \}\}    # }}
+END;
+  preg_match_all('@' . $regex . '@sx', $code, $single_matches, PREG_SET_ORDER);
+
+  // Match the Twig t filter with double quotes: {{ "translatable string"|t }}
+  $regex = <<<'END'
+    \{\{    # {{
+    \s*     # optional whitespace
+    (       # beginning of string
+    "       # opening double quote
+    [^"\\]* # optional regular characters (not quotes or escaped characters)
+    (?:     # an optional group of...
+    \\.     # an escaped character, plus...
+    [^"\\]* # optional regular characters (not quotes or escaped characters)
+    )*
+    "       # closing double quote
+    )       # end of string
+    \s*     # optional whitespace
+    \|      # pipe
+    \s*     # optional whitespace
+    t       # t
+    \s*     # optional whitespace
+    \}\}    # }}
+END;
+  preg_match_all('@' . $regex . '@sx', $code, $double_matches, PREG_SET_ORDER);
+  $t_matches = array_merge($single_matches, $double_matches);
+
+  foreach ($t_matches as $match) {
+    // Remove match from code to help us identify faulty usages of the filter.
+    $code = str_replace($match[0], '', $code);
+    $save_callback(_potx_format_quoted_string($match[1]), POTX_CONTEXT_NONE, $file, 0);
+  }
+
+  // Any remaining uses of the t filter are incorrect. Identify them.
+  // This regex can be confused by strings containing, for example, "|t|",
+  // but in general strings shouldn't make it to this check, as they would have
+  // been passed through the t filter already.
+  $regex = '
+    \{\{    # {{
+    [^}]*   # anything but a closing bracket
+    \|      # pipe
+    \s*     # optional whitespace
+    t       # t
+    [\s\|]* # either whitespace or a pipe
+    [^}]*   # optional characters
+    \}\}    # }}
+  ';
+  preg_match_all('@' . $regex . '@sx', $code, $faulty_matches, PREG_SET_ORDER);
+  if (isset($faulty_matches) && count($faulty_matches)) {
+    foreach ($faulty_matches as $index => $match) {
+      $message = t('Uses of the t filter in Twig templates should start with a single literal string, and should not be chained.');
+      // TODO: Fill in specific URL for Twig documentation once it exists.
+      potx_status('error', $message, $file, NULL, $match[0], 'https://drupal.org/developing/api/localization');
+    }
+  }
+}
+
+/**
+ * Detect all occurances of @Translation annotations in doc comments.
+ *
+ * @param $file
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ */
+function _potx_find_translation_annotations($file, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  if (isset($_potx_lookup['T_DOC_COMMENT'])) {
+    foreach ($_potx_lookup['T_DOC_COMMENT'] as $ti) {
+      list($type, $string, $line) = $_potx_tokens[$ti];
+      // Match for a possible empty string too, so we can signal that kind of
+      // error in our standard way (from the save callback), instead of signaling
+      // a generic error from here around syntax.
+      preg_match_all('!@Translation\("(.*)"\)!', $string, $found);
+      if (isset($found) && is_array($found) && count($found[1])) {
+        foreach ($found[1] as $index => $match) {
+          $save_callback(
+            $match,
+            POTX_CONTEXT_NONE,
+            $file,
+            $line
+          );
+          // Remove this annotation from the comment. This way if we have any
+          // left after this foreach, we have bugos ones left and can use that
+          // to signal an error.
+          $string = str_replace($found[0][$index], '', $string);
+        }
+      }
+      if (strpos($string, '@Translation')) {
+        // @Translation annotations still exist, so we have ones that did not
+        // match the expected pattern.
+        _potx_marker_error($file, $line, "@Translation", $ti, t('In @Translation, only one, non-empty static string is allowed in double quotes.'), 'https://drupal.org/node/1882526');
+      }
+    }
+  }
+}
+
+/**
+ * Parse a YAML file for translatables. Drupal 8+.
+ */
+function _potx_parse_yaml_file($code, $file_name, $save_callback) {
+  // Handle .info.yml files.
+  if (substr($file_name, -9) === '.info.yml') {
+    _potx_find_info_yml_file_strings($code, $file_name, $save_callback);
+  }
+  // Handle configuration schema files, found in config/schema directories.
+  elseif (preg_match('~config/schema/[^/]+\.schema\.yml$~', $file_name)) {
+    $schema = Yaml::parse($code);
+    _potx_find_config_schema_labels($schema, $file_name, $save_callback);
+  }
+}
+
+/**
+ * Recursively extract 'label' values from a configuration schema array.
+ */
+function _potx_find_config_schema_labels($schema, $file_name, $save_callback) {
+  foreach ($schema as $key => $value) {
+    if (is_array($value)) {
+      _potx_find_config_schema_labels($value, $file_name, $save_callback);
+    }
+    elseif ($key == 'label') {
+      $save_callback(addcslashes($value, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+    }
+  }
+}
+
+/**
+ * Parse a .info.yml file and add relevant strings to the list.
+ */
+function _potx_find_info_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
+  $info = Yaml::parse($code);
+
+  // We need the name, description and package values. Others,
+  // like core and PHP compatibility, timestamps or versions
+  // are not to be translated.
+  foreach (array('name', 'description', 'package') as $key) {
+    if (isset($info[$key])) {
+      // No context support for .info.yml file strings.
+      $save_callback(addcslashes($info[$key], "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+    }
+  }
+
+  // Add region names from themes.
+  if (isset($info['regions']) && is_array($info['regions'])) {
+    foreach ($info['regions'] as $region => $region_name) {
+      // No context support for .info.yml file strings.
+      $save_callback(addcslashes($region_name, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+    }
+  }
 }
 
 /**
@@ -1462,7 +1770,7 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   $dirs = glob($path .'*', GLOB_ONLYDIR);
   if (is_array($dirs)) {
     foreach ($dirs as $dir) {
-      if (!preg_match("!(^|.+/)(CVS|\.svn|\.git|tests)$!", $dir)) {
+      if (!preg_match("!(^|.+/)(CVS|\.svn|\.git|tests|vendor)$!", $dir)) {
         $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
       }
     }

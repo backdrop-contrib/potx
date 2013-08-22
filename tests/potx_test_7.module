@@ -45,6 +45,7 @@ function potx_test_7_page() {
   $t('Dynamic callback test string');
 
   t('Test string in context', array(), array('context' => 'Test context'));
+  format_plural($count, '1 test string in context', '@count test strings in context', array(), array('context' => 'Test context'));
   t('');
 
   st('Installer string in context', array(), array('context' => 'Installer context'));
