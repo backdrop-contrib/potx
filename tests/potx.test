@@ -247,6 +247,18 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Test parsing of Drupal 8 .routing.yml files.
+   */
+  public function testDrupal8RoutingYml() {
+    $filename = drupal_get_path('module', 'potx'). '/tests/potx_test_8.routing.yml';
+    $this->parseFile($filename, POTX_API_8);
+
+    // Look for all title can be extracted
+    $this->assertMsgID('Build translation test');
+    $this->assertMsgID('Build alternative translation');
+  }
+
+  /**
    * Test parsing of Drupal 8 configuration schema files.
    */
   public function testDrupal8ConfigurationSchema() {

@@ -1683,6 +1683,9 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
   if (substr($file_name, -9) === '.info.yml') {
     _potx_find_info_yml_file_strings($code, $file_name, $save_callback);
   }
+  if (substr($file_name, -12) === '.routing.yml') {
+    _potx_find_routing_yml_file_strings($code, $file_name, $save_callback);
+  }
   // Handle configuration schema files, found in config/schema directories.
   elseif (preg_match('~config/schema/[^/]+\.schema\.yml$~', $file_name)) {
     $schema = Yaml::parse($code);
@@ -1725,6 +1728,26 @@ function _potx_find_info_yml_file_strings($code, $file_name, $save_callback, $ap
     foreach ($info['regions'] as $region => $region_name) {
       // No context support for .info.yml file strings.
       $save_callback(addcslashes($region_name, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+    }
+  }
+}
+
+/**
+ * Parse a .routing.yml file and add relevant strings to the list.
+ */
+function _potx_find_routing_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
+  $info = Yaml::parse($code);
+
+  // Route item titles are provided as a defaults subkey on the route:
+  // route_name:
+  //   defaults:
+  //     _title: 'Route title'
+  // Just take all _title key values on this nesting level.
+  foreach ($info as $route => $route_data) {
+    foreach ($route_data as $key => $value) {
+      if (is_array($value) && array_key_exists('_title', $value)) {
+        $save_callback($value['_title'], POTX_CONTEXT_NONE, $file_name);
+      }
     }
   }
 }
