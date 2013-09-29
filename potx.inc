@@ -1450,7 +1450,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
     (?:,\s*' . POTX_JS_OBJECT . '\s*            # optionally capture str args
       (?:,\s*' . POTX_JS_OBJECT_CONTEXT . '\s*) # optionally capture context
     ?)?                                         # close optional args
-    [\)]                                        # match ")" or "," to finish
+    \)                                          # match ")" to finish
     ~sx', $code, $t_matches, PREG_SET_ORDER);
 
   // Add strings from Drupal.t().
@@ -1501,7 +1501,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
     (?:,\s*' . POTX_JS_OBJECT . '\s*              # optionally capture string args
       (?:,\s*' . POTX_JS_OBJECT_CONTEXT . '\s*)?  # optionally capture context
     )?
-    [\)]
+    \)                                            # match ")" to finish
     ~sx', $code, $plural_matches, PREG_SET_ORDER);
 
   if (isset($plural_matches) && count($plural_matches)) {
