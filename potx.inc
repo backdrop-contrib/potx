@@ -212,6 +212,11 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     _potx_parse_twig_file($code, $file_name, $save_callback);
   }
 
+  $constraint_extract = FALSE;
+  if (substr($name_parts['filename'], -10) == 'Constraint' && $api_version > POTX_API_7) {
+    $constraint_extract = TRUE;
+  }
+
   // Extract raw PHP language tokens.
   $raw_tokens = token_get_all($code);
   unset($code);
@@ -226,11 +231,14 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     if ((!is_array($token)) || (($token[0] != T_WHITESPACE) && ($token[0] != T_INLINE_HTML))) {
       if (is_array($token)) {
         $token[] = $line_number;
+
+         $constraint_match = $constraint_extract && $token[0] == T_VARIABLE && strlen($token[1]) >= 7 && substr_compare($token[1], 'message', -7, 7, true) === 0;
+
          // Fill array for finding token offsets quickly.
-         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t')) {
+         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t') || $constraint_match) {
 
            // Give doc comments a specific key because their content varies.
-           $key = ($token[0] == T_DOC_COMMENT) ? 'T_DOC_COMMENT' : $token[1];
+           $key = ($token[0] == T_DOC_COMMENT) ? 'T_DOC_COMMENT' : ($constraint_match ? 'T_POTX_CONSTRAINT' : $token[1]);
            if (!isset($_potx_lookup[$key])) {
              $_potx_lookup[$key] = array();
            }
@@ -297,6 +305,10 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   // Support @Translation annotation (in doc comments) on Drupal 8+.
   if ($api_version > POTX_API_7) {
     _potx_find_translation_annotations($file_name, $save_callback);
+  }
+
+  if ($constraint_extract) {
+    _potx_find_constraint_messages($file_name, $save_callback);
   }
 
   // Special handling of some Drupal core files.
@@ -1747,6 +1759,50 @@ function _potx_find_routing_yml_file_strings($code, $file_name, $save_callback, 
     foreach ($route_data as $key => $value) {
       if (is_array($value) && array_key_exists('_title', $value)) {
         $save_callback($value['_title'], POTX_CONTEXT_NONE, $file_name);
+      }
+    }
+  }
+}
+
+
+/**
+ * Detect validation constraint messages. Drupal 8+
+ *
+ * This sequences is searched for:
+ *   T_POTX_CONSTRAINT = T_CONSTANT_ENCAPSED_STRING
+ *
+ * note: T_POTX_CONSTRAINT is marked for T_VARIABLE tokens inside .php files
+ *   with the "Constraint" suffix, where the token is "$message", or ends
+ *   with "Message"
+ *
+ * @param $file_name
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ */
+function _potx_find_constraint_messages($file_name, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  foreach ($_potx_lookup['T_POTX_CONSTRAINT'] as $key => $ti) {
+
+    if ($_potx_tokens[$ti + 1] == '=' && $_potx_tokens[$ti + 2][0] == T_CONSTANT_ENCAPSED_STRING) {
+      $str = $_potx_tokens[$ti + 2][1];
+
+      // Find plural versions if available.
+      if (strpos($str, '|') !== FALSE) {
+        $quo = substr($str, 0, 1);
+        $break = strpos($str, '|');
+        $singular = substr($str, 0, $break) . $quo;
+        $plural = $quo . substr($str, $break + 1);
+        $save_callback(
+            _potx_format_quoted_string($singular) ."\0". _potx_format_quoted_string($plural),
+            POTX_CONTEXT_NONE,
+            $file_name,
+            $_potx_tokens[$ti][2]
+        );
+      }
+      else {
+        $save_callback(_potx_format_quoted_string($str), POTX_CONTEXT_NONE, $file_name, $_potx_tokens[$ti][2]);
       }
     }
   }

@@ -283,6 +283,19 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Test parsing Drupal 8 validation constraint messages.
+   */
+  public function testDrupal8ConstraintMessages() {
+    $filename = drupal_get_path('module', 'potx') .'/tests/TestConstraint.php';
+    $this->parseFile($filename, POTX_API_8);
+
+    $this->assertMsgID('Test message');
+    $this->assertMsgID('Test message 2');
+    $this->assertPluralID('1 test message', '@count test message');
+    $this->assertNoMsgID('Not a message for translation');
+  }
+
+  /**
    * Test parsing of Drupal 6 info file. Drupal 5 and 7 have no other rules.
    */
   public function testDrupalInfo() {
