@@ -218,6 +218,9 @@ class PotxTestCase extends DrupalWebTestCase {
     $filename = drupal_get_path('module', 'potx') .'/tests/potx_test_8.module';
     $this->parseFile($filename, POTX_API_8);
 
+    // Test parsing $this->t calls in D8 code
+    $this->assertMsgID('Using t inside D8 classes ($this->t)');
+    
     // Assert strings found in module source code.
     $this->assertMsgID('Good translation annotation');
     $this->assertMsgID('Another good translation annotation');
