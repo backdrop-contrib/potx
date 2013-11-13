@@ -1750,15 +1750,22 @@ function _potx_find_info_yml_file_strings($code, $file_name, $save_callback, $ap
 function _potx_find_routing_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
   $info = Yaml::parse($code);
 
-  // Route item titles are provided as a defaults subkey on the route:
+  // Route item titles are provided as a defaults subkey on the route,
+  // and can optionally include a context subkey:
   // route_name:
   //   defaults:
   //     _title: 'Route title'
+  //     _title_context: 'Title context'
   // Just take all _title key values on this nesting level.
   foreach ($info as $route => $route_data) {
     foreach ($route_data as $key => $value) {
       if (is_array($value) && array_key_exists('_title', $value)) {
-        $save_callback($value['_title'], POTX_CONTEXT_NONE, $file_name);
+        if (array_key_exists('_title_context', $value)) {
+          $save_callback($value['_title'], $value['_title_context'], $file_name);
+        }
+        else {
+          $save_callback($value['_title'], POTX_CONTEXT_NONE, $file_name);
+        }
       }
     }
   }

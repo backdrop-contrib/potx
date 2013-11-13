@@ -220,7 +220,7 @@ class PotxTestCase extends DrupalWebTestCase {
 
     // Test parsing $this->t calls in D8 code
     $this->assertMsgID('Using t inside D8 classes ($this->t)');
-    
+
     // Assert strings found in module source code.
     $this->assertMsgID('Good translation annotation');
     $this->assertMsgID('Another good translation annotation');
@@ -259,6 +259,7 @@ class PotxTestCase extends DrupalWebTestCase {
     // Look for all title can be extracted
     $this->assertMsgID('Build translation test');
     $this->assertMsgID('Build alternative translation');
+    $this->assertMsgIDContext('Translation title in context', 'Title context');
   }
 
   /**
