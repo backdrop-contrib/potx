@@ -262,6 +262,29 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgIDContext('Translation title in context', 'Title context');
   }
 
+  public function testDrupal8LocalContextualYml() {
+    $filenames = array(
+      drupal_get_path('module', 'potx'). '/tests/potx_test_8.local_tasks.yml',
+      drupal_get_path('module', 'potx'). '/tests/potx_test_8.local_actions.yml',
+      drupal_get_path('module', 'potx'). '/tests/potx_test_8.contextual_links.yml'
+    );
+
+    $this->parseFile($filenames[0], POTX_API_8);
+
+    $this->assertMsgID('Local task translation test');
+    $this->assertMsgIDContext('Local task translation with context test', 'Local task context');
+
+    $this->parseFile($filenames[1], POTX_API_8);
+
+    $this->assertMsgID('Local action translation test');
+    $this->assertMsgIDContext('Local action translation with context test', 'Local action context');
+
+    $this->parseFile($filenames[2], POTX_API_8);
+
+    $this->assertMsgID('Test Contextual link');
+    $this->assertMsgIDContext('Test Contextual link with context', 'Contextual Context');
+  }
+
   /**
    * Test parsing of Drupal 8 configuration schema files.
    */

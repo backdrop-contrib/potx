@@ -1695,8 +1695,13 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
   if (substr($file_name, -9) === '.info.yml') {
     _potx_find_info_yml_file_strings($code, $file_name, $save_callback);
   }
-  if (substr($file_name, -12) === '.routing.yml') {
+  elseif (substr($file_name, -12) === '.routing.yml') {
     _potx_find_routing_yml_file_strings($code, $file_name, $save_callback);
+  }
+  elseif (substr($file_name, -16) === '.local_tasks.yml' ||
+          substr($file_name, -18) === '.local_actions.yml' ||
+          substr($file_name, -21) === '.contextual_links.yml') {
+    _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_callback);
   }
   // Handle configuration schema files, found in config/schema directories.
   elseif (preg_match('~config/schema/[^/]+\.schema\.yml$~', $file_name)) {
@@ -1771,6 +1776,25 @@ function _potx_find_routing_yml_file_strings($code, $file_name, $save_callback, 
   }
 }
 
+/**
+ * Parse a .local_tasks.yml, .local_actions.yml, or .contextual_links.yml file, and add relevant strings to the list.
+ */
+function _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
+  $info = Yaml::parse($code);
+
+  // Local tasks, local actions, and contextual links contain a title and an
+  // optional title_context, which should be translated.
+  foreach ($info as $key => $value) {
+    if (is_array($value) && array_key_exists('title', $value)) {
+      if (array_key_exists('title_context', $value)) {
+        $save_callback($value['title'], $value['title_context'], $file_name);
+      }
+      else {
+        $save_callback($value['title'], POTX_CONTEXT_NONE, $file_name);
+      }
+    }
+  }
+}
 
 /**
  * Detect validation constraint messages. Drupal 8+
