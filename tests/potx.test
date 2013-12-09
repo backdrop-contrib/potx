@@ -234,6 +234,12 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assert(count($this->potx_status) == 2, t('2 error messages found'));
     $this->assert($this->potx_status[0][0] == 'In @Translation, only one, non-empty static string is allowed in double quotes.', t('Incorrect @Translation found.'));
     $this->assert($this->potx_status[1][0] == $this->empty_error, t('Second empty error found.'));
+
+    $this->assertPluralID('1 formatPlural test string', '@count formatPlural test strings');
+    $this->assertPluralIDContext('1 formatPlural test string in context', '@count formatPlural test strings in context', 'Test context');
+
+    $this->assertPluralID('1 translation->formatPlural test string', '@count translation->formatPlural test strings');
+    $this->assertPluralIDContext('1 translation->formatPlural test string in context', '@count translation->formatPlural test strings in context', 'Test context');
   }
 
   /**

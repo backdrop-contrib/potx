@@ -37,7 +37,7 @@ function potx_test_8_empty() {
 }
 
 /**
- * Test parsing Drupal 8 $this->t function calls.
+ * Test parsing Drupal 8 $this->t and formatPlural function calls.
  */
 class PotxTestD8 {
   function test_func() {
@@ -45,5 +45,13 @@ class PotxTestD8 {
     // the translation service. please refer to https://drupal.org/node/2079611
     // for an example.
     $test_translation = $this->t('Using t inside D8 classes ($this->t)');
+  }
+
+  function testFormatPlural() {
+    $this->formatPlural($count, '1 formatPlural test string', '@count formatPlural test strings');
+    $this->formatPlural($count, '1 formatPlural test string in context', '@count formatPlural test strings in context', array(), array('context' => 'Test context'));
+
+    \Drupal::translation()->formatPlural($count, '1 translation->formatPlural test string in context', '@count translation->formatPlural test strings in context', array(), array('context' => 'Test context'));
+    \Drupal::translation()->formatPlural($count, '1 translation->formatPlural test string', '@count translation->formatPlural test strings');
   }
 }

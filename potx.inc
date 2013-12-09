@@ -290,7 +290,12 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   }
 
   // Plurals need unique parsing.
-  _potx_find_format_plural_calls($file_name, $save_callback, $api_version);
+  _potx_find_format_plural_calls($file_name, $save_callback, 'format_plural', $api_version);
+
+  // Support for formatPlural() calls in Drupal 8+.
+  if ($api_version > POTX_API_7) {
+    _potx_find_format_plural_calls($file_name, $save_callback, 'formatPlural', $api_version);
+  }
 
   if ($name_parts['extension'] == 'module') {
     if ($api_version < POTX_API_7) {
@@ -935,7 +940,7 @@ function _potx_find_watchdog_calls($file, $save_callback) {
  * Detect all occurances of format_plural calls.
  *
  * These sequences are searched for:
- *   T_STRING("format_plural") + "(" + ..anything (might be more tokens).. +
+ *   T_STRING("$function_name") + "(" + ..anything (might be more tokens).. +
  *   "," + T_CONSTANT_ENCAPSED_STRING +
  *   "," + T_CONSTANT_ENCAPSED_STRING + parenthesis (or comma allowed from
  *   Drupal 6)
@@ -944,14 +949,17 @@ function _potx_find_watchdog_calls($file, $save_callback) {
  *   Name of file parsed.
  * @param $save_callback
  *   Callback function used to save strings.
+ * @param $function_name
+ *   The name of the function to look for (could be 'format_plural' or
+ *   'formatPlural').
  * @param $api_version
  *   Drupal API version to work with.
  */
-function _potx_find_format_plural_calls($file, $save_callback, $api_version = POTX_API_CURRENT) {
+function _potx_find_format_plural_calls($file, $save_callback, $function_name = 'format_plural', $api_version = POTX_API_CURRENT) {
   global $_potx_tokens, $_potx_lookup;
 
-  if (isset($_potx_lookup['format_plural'])) {
-    foreach ($_potx_lookup['format_plural'] as $ti) {
+  if (isset($_potx_lookup[$function_name])) {
+    foreach ($_potx_lookup[$function_name] as $ti) {
       list($ctok, $par1) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1]);
       list($type, $string, $line) = $ctok;
       if ($par1 == "(") {
@@ -977,7 +985,7 @@ function _potx_find_format_plural_calls($file, $save_callback, $api_version = PO
           if ($par2 == ',' && $api_version > POTX_API_6) {
             // If there was a comma after the plural, we need to look forward
             // to try and find the context.
-            $context = _potx_find_context($ti, $tn + 5, $file, 'format_plural');
+            $context = _potx_find_context($ti, $tn + 5, $file, $function_name);
           }
           if ($context !== POTX_CONTEXT_ERROR) {
             // Only save if there was no error in context parsing.
@@ -990,8 +998,8 @@ function _potx_find_format_plural_calls($file, $save_callback, $api_version = PO
           }
         }
         else {
-          // format_plural() found, but the parameters are not correct.
-          _potx_marker_error($file, $line, "format_plural", $ti, t('In format_plural(), the singular and plural strings should be literal strings. There should be no variables, concatenation, constants or even a t() call there.'), 'http://drupal.org/node/323072');
+          // $function_name() found, but the parameters are not correct.
+          _potx_marker_error($file, $line, $function_name, $ti, t('In @function(), the singular and plural strings should be literal strings. There should be no variables, concatenation, constants or even a t() call there.', array('@function' => $function_name)), 'http://drupal.org/node/323072');
         }
       }
     }
