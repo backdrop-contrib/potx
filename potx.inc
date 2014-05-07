@@ -1711,6 +1711,9 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
           substr($file_name, -21) === '.contextual_links.yml') {
     _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_callback);
   }
+  elseif (substr($file_name, -15) === '.menu_links.yml') {
+    _potx_find_menu_links_yml_file_strings($code, $file_name, $save_callback);
+  }
   // Handle configuration schema files, found in config/schema directories.
   elseif (preg_match('~config/schema/[^/]+\.schema\.yml$~', $file_name)) {
     $schema = Yaml::parse($code);
@@ -1800,6 +1803,31 @@ function _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_c
       else {
         $save_callback($value['title'], POTX_CONTEXT_NONE, $file_name);
       }
+    }
+  }
+}
+
+/**
+ * Parse a .menu_links.yml file, and add relevant strings to the list.
+ */
+function _potx_find_menu_links_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
+  $info = Yaml::parse($code);
+
+  // Menu links contain a title and an optional title_context, as well as an
+  // optional description, which should be translated.
+  foreach ($info as $key => $value) {
+    if (is_array($value) && array_key_exists('title', $value)) {
+      // Title context is pending on https://drupal.org/node/2119551, but added
+      // here already.
+      if (array_key_exists('title_context', $value)) {
+        $save_callback($value['title'], $value['title_context'], $file_name);
+      }
+      else {
+        $save_callback($value['title'], POTX_CONTEXT_NONE, $file_name);
+      }
+    }
+    if (is_array($value) && array_key_exists('description', $value)) {
+      $save_callback($value['description'], POTX_CONTEXT_NONE, $file_name);
     }
   }
 }
