@@ -13,6 +13,8 @@
  * @Translation("Translation in good context", context="Translation test")
  */
 function potx_test_8_example() {
+  $a = new TranslationWrapper('TranslationWrapper string');
+  $b = new TranslationWrapper('TranslationWrapper string with context', array(), array('context' => 'With context'));
 }
 
 /**

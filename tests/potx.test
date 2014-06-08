@@ -258,6 +258,9 @@ class PotxTestCase extends DrupalWebTestCase {
 
     $this->assertPluralID('1 translation->formatPlural test string', '@count translation->formatPlural test strings');
     $this->assertPluralIDContext('1 translation->formatPlural test string in context', '@count translation->formatPlural test strings in context', 'Test context');
+
+    $this->assertMsgID('TranslationWrapper string');
+    $this->assertMsgIDContext('TranslationWrapper string with context', 'With context');
   }
 
   /**
