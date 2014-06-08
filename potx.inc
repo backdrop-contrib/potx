@@ -22,7 +22,7 @@
  */
 
 /**
- * Use the Symfony YAML parser, found in the vendor directory.
+ * Use Twig and the Symfony YAML parser, found in the vendor directory.
  */
 set_include_path(get_include_path() . PATH_SEPARATOR . __DIR__ . '/vendor');
 spl_autoload_register(function($c){
@@ -1571,84 +1571,165 @@ function _potx_parse_js_string($string) {
 
 /**
  * Parse a Twig template for translatables. Drupal 8+.
- *
- * Extracts strings from Twig t filter calls and inserts them into potx
- * storage.
  */
 function _potx_parse_twig_file($code, $file, $save_callback) {
-  // Match the Twig t filter with single quotes: {{ 'translatable string'|t }}
-  $regex = <<<'END'
-    \{\{    # {{
-    \s*     # optional whitespace
-    (       # beginning of string
-    '       # opening single quote
-    [^'\\]* # optional regular characters (not quotes or escaped characters)
-    (?:     # an optional group of...
-    \\.     # an escaped character, plus...
-    [^'\\]* # optional regular characters (not quotes or escaped characters)
-    )*
-    '       # closing single quote
-    )       # end of string
-    \s*     # optional whitespace
-    \|      # pipe
-    \s*     # optional whitespace
-    t       # t
-    \s*     # optional whitespace
-    \}\}    # }}
-END;
-  preg_match_all('@' . $regex . '@sx', $code, $single_matches, PREG_SET_ORDER);
+  $twig_lexer = new Twig_Lexer();
+  $stream = $twig_lexer->tokenize($code, $file);
 
-  // Match the Twig t filter with double quotes: {{ "translatable string"|t }}
-  $regex = <<<'END'
-    \{\{    # {{
-    \s*     # optional whitespace
-    (       # beginning of string
-    "       # opening double quote
-    [^"\\]* # optional regular characters (not quotes or escaped characters)
-    (?:     # an optional group of...
-    \\.     # an escaped character, plus...
-    [^"\\]* # optional regular characters (not quotes or escaped characters)
-    )*
-    "       # closing double quote
-    )       # end of string
-    \s*     # optional whitespace
-    \|      # pipe
-    \s*     # optional whitespace
-    t       # t
-    \s*     # optional whitespace
-    \}\}    # }}
-END;
-  preg_match_all('@' . $regex . '@sx', $code, $double_matches, PREG_SET_ORDER);
-  $t_matches = array_merge($single_matches, $double_matches);
+  while (!$stream->isEOF()) {
+    $token = $stream->next();
+    // Capture strings translated with the t or trans filter.
+    if ($token->test(Twig_Token::VAR_START_TYPE)) {
+      $token = $stream->next();
+      if ($token->test(Twig_Token::NAME_TYPE)) {
+        continue;
+      }
+      $string = $token->getValue();
+      $line = $token->getLine();
+      $has_t = false;
+      $chained = false;
+      $is_concat = false;
 
-  foreach ($t_matches as $match) {
-    // Remove match from code to help us identify faulty usages of the filter.
-    $code = str_replace($match[0], '', $code);
-    $save_callback(_potx_format_quoted_string($match[1]), POTX_CONTEXT_NONE, $file, 0);
-  }
+      if ($stream->test(Twig_Token::PUNCTUATION_TYPE, '.')) {
+        $is_concat = true;
+      }
 
-  // Any remaining uses of the t filter are incorrect. Identify them.
-  // This regex can be confused by strings containing, for example, "|t|",
-  // but in general strings shouldn't make it to this check, as they would have
-  // been passed through the t filter already.
-  $regex = '
-    \{\{    # {{
-    [^}]*   # anything but a closing bracket
-    \|      # pipe
-    \s*     # optional whitespace
-    t       # t
-    [\s\|]* # either whitespace or a pipe
-    [^}]*   # optional characters
-    \}\}    # }}
-  ';
-  preg_match_all('@' . $regex . '@sx', $code, $faulty_matches, PREG_SET_ORDER);
-  if (isset($faulty_matches) && count($faulty_matches)) {
-    foreach ($faulty_matches as $index => $match) {
-      $message = t('Uses of the t filter in Twig templates should start with a single literal string, and should not be chained.');
-      // TODO: Fill in specific URL for Twig documentation once it exists.
-      potx_status('error', $message, $file, NULL, $match[0], 'https://drupal.org/developing/api/localization');
+      while (!$stream->isEOF() && ($token = $stream->next()) && (!$token->test(Twig_Token::VAR_END_TYPE))) {
+        if ($token->test(Twig_Token::PUNCTUATION_TYPE, '|')) {
+          if ($stream->test(array('t', 'trans'))) {
+            $has_t = true;
+          }
+          else {
+            $chained = true;
+          }
+        }
+      }
+
+      if ($has_t) {
+        if (!$chained && !$is_concat) {
+          $save_callback(_potx_format_quoted_string('"' . trim($string) . '"'), POTX_CONTEXT_NONE, $file, $line);
+        }
+        else {
+          $message = t('Uses of the t filter in Twig templates should start with a single literal string, and should not be chained.');
+          // TODO: Fill in specific URL for Twig documentation once it exists.
+          potx_status('error', $message, $file, NULL, NULL, 'https://drupal.org/developing/api/localization');
+        }
+      }
+    }
+    elseif ($token->test(Twig_Token::BLOCK_START_TYPE)) {
+      $token = $stream->next();
+      if ($token->test('trans')) {
+        _potx_process_twig_trans_tag($stream, $file, $save_callback);
+      }
     }
   }
+}
+
+/**
+ * Parses a single {% trans %} tag, and extracts the translatable string.
+ *
+ * a {% trans %} tag can have the following formats:
+ *   1. {% trans 'string' %}
+ *   2. {% trans %} string {% endtrans %}
+ *   3. {% trans %} singular string {% plural %} plural string {% endtrans %}
+ *
+ * @param Twig_TokenStream $stream
+ */
+function _potx_process_twig_trans_tag($stream, $file, $save_callback) {
+  $is_plural = FALSE;
+  $context = POTX_CONTEXT_NONE;
+
+  // If the current token in the stream is a string, this trans tag
+  // has a simple string argument to be translated.
+  $token = $stream->next();
+  if ($token->test(Twig_Token::STRING_TYPE)) {
+    $text = $token->getValue();
+    // Check for context.
+    $token = $stream->next();
+    if ($token->test(Twig_Token::NAME_TYPE, 'with')) {
+      $context = _potx_find_twig_trans_context($stream);
+    }
+    $save_callback(_potx_format_quoted_string('"' . trim($text) . '"'), $context, $file, $token->getLine());
+    return;
+  }
+
+  // Otherwise, we are in a trans/endtrans structure.
+
+  $text = array();
+  $line = $token->getLine();
+  // Process the stream until we reach the endtrans tag.
+  while (!$stream->isEOF() && (!$token->test('endtrans'))) {
+    // If it's text, add it to the translation.
+    if ($token->test(Twig_Token::TEXT_TYPE)) {
+      $text[] = $token->getValue();
+    }
+    elseif ($token->test(Twig_Token::NAME_TYPE, 'with')) {
+      $context = _potx_find_twig_trans_context($stream);
+    }
+    elseif ($token->test('plural')) {
+      $singular = implode('', $text);
+      $is_plural = true;
+      $text = array();
+      // Skip past the 'count' token.
+      $stream->next();
+    }
+    elseif ($token->test(Twig_Token::VAR_START_TYPE)) {
+      while ($stream->look(1)->test(Twig_Token::PUNCTUATION_TYPE, '.')) {
+        $stream->next();
+        $stream->next();
+      }
+      $token = $stream->next();
+      $name = $token->getValue();
+      // Figure out if it's escaped, passthrough, or placeholder.
+      $token = $stream->next();
+      // If the next thing we see is }}, this is escaped.
+      if ($token->test(Twig_Token::VAR_END_TYPE)) {
+        $text[] = "@$name";
+      }
+      // If the next thing we see is |, this is either passthrough or placeholder.
+      elseif ($token->test(Twig_Token::PUNCTUATION_TYPE, '|')) {
+        $token = $stream->next();
+        if ($token->getValue() == 'passthrough') {
+          $text[] = "!$name";
+        }
+        elseif ($token->getValue() == 'placeholder') {
+          $text[] = "%$name";
+        }
+      }
+    }
+    $token = $stream->next();
+  }
+
+  if ($is_plural) {
+    $plural = implode('', $text);
+    $save_callback(_potx_format_quoted_string('"' . trim($singular) . '"') . "\0" . _potx_format_quoted_string('"' . trim($plural) . '"'), $context, $file, $line);
+  }
+  else {
+    $save_callback(_potx_format_quoted_string('"' . trim(implode('', $text)) . '"'), $context, $file, $line);
+  }
+}
+
+/**
+ * Look for a 'context' parameter in {% trans %} tags, that appear after the
+ *   'with' keyword.
+ */
+function _potx_find_twig_trans_context($stream) {
+  $token = $stream->next();
+  if ($token->test(Twig_Token::PUNCTUATION_TYPE, '{')) {
+    while (!$stream->isEOF() && ($token = $stream->next()) && !$token->test(Twig_Token::PUNCTUATION_TYPE, '}')) {
+      if ($token->test(Twig_Token::STRING_TYPE, 'context')) {
+        // Skip the ':' character.
+        $stream->next();
+
+        $token = $stream->next();
+        if ($token->test(Twig_Token::STRING_TYPE)) {
+          return $token->getValue();
+        }
+      }
+    }
+  }
+
+  return POTX_CONTEXT_NONE;
 }
 
 /**
@@ -1898,6 +1979,9 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   $extensions = array('php', 'inc', 'module', 'engine', 'theme', 'install', 'info', 'profile');
   if ($api_version > POTX_API_5) {
     $extensions[] = 'js';
+  }
+  if ($api_version > POTX_API_7) {
+    $extensions[] = 'twig';
   }
   $files = array();
   foreach ($extensions as $extension) {
