@@ -2009,7 +2009,7 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   if (is_array($dirs)) {
     foreach ($dirs as $dir) {
       if (!preg_match("!(^|.+/)(CVS|\.svn|\.git|tests|vendor)$!", $dir)) {
-        $files = array_merge($files, _potx_explore_dir("$dir/", $basename));
+        $files = array_merge($files, _potx_explore_dir("$dir/", $basename, $api_version, $skip_self));
       }
     }
   }
