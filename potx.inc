@@ -1986,6 +1986,7 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   }
   if ($api_version > POTX_API_7) {
     $extensions[] = 'twig';
+    $extensions[] = 'yml';
   }
   $files = array();
   foreach ($extensions as $extension) {
