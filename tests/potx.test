@@ -219,7 +219,7 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Pass-through: !string');
     $this->assertMsgID('Placeholder: %string');
 
-    $this->assertMsgID('This @name has a length of: @count. It contains: %numbers and @bad_text. Lets pass the bad text through: !bad_text.');
+    $this->assertMsgID('This @node.type is submitted by @author.name, and has a length of: @count. It contains: %node.numbers and @node.bad_text. Lets pass the bad text through: !node.bad_text.');
 
     $this->assertMsgIDContext('I have context.', 'Lolspeak');
     $this->assertNoMsgIDContext('I have no context.', 'zz');

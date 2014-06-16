@@ -1678,12 +1678,16 @@ function _potx_process_twig_trans_tag($stream, $file, $save_callback) {
       $stream->next();
     }
     elseif ($token->test(Twig_Token::VAR_START_TYPE)) {
+      $name = array();
       while ($stream->look(1)->test(Twig_Token::PUNCTUATION_TYPE, '.')) {
-        $stream->next();
+        $token = $stream->next();
+        $name[] = $token->getValue();
         $stream->next();
       }
       $token = $stream->next();
-      $name = $token->getValue();
+      $name[] = $token->getValue();
+
+      $name = implode('.', $name);
       // Figure out if it's escaped, passthrough, or placeholder.
       $token = $stream->next();
       // If the next thing we see is }}, this is escaped.

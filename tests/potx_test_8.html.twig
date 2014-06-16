@@ -72,11 +72,12 @@
   {% endtrans %}
 </div>
 {# Test trans tag with complex tokens. #}
-{% set token = {'name': 'complex token', 'numbers': '12345', 'bad_text': '&"<>' } %}
+{% set node = {'type': 'complex token', 'numbers': '12345', 'bad_text': '&"<>' } %}
+{% set author = {'name': 'foo'} %}
 {% set count = token|length %}
 <div>
   {% trans %}
-    This {{ token.name }} has a length of: {{ count }}. It contains: {{ token.numbers|placeholder }} and {{ token.bad_text }}. Lets pass the bad text through: {{ token.bad_text|passthrough }}.
+    This {{ node.type }} is submitted by {{ author.name }}, and has a length of: {{ count }}. It contains: {{ node.numbers|placeholder }} and {{ node.bad_text }}. Lets pass the bad text through: {{ node.bad_text|passthrough }}.
   {% endtrans %}
 </div>
 {# Test trans tag with context. #}
