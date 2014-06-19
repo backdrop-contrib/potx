@@ -39,6 +39,8 @@ function potx_test_6_menu_alter(&$items) {
 function potx_test_6_page() {
   t('This is a test string.');
   format_plural($count, '1 test string', '@count test strings');
+  format_plural($count);
+  format_plural();
   watchdog('test watchdog type', 'My watchdog message');
 
   st('Installer only test string');

@@ -15,6 +15,21 @@
 function potx_test_8_example() {
   $a = new TranslationWrapper('TranslationWrapper string');
   $b = new TranslationWrapper('TranslationWrapper string with context', array(), array('context' => 'With context'));
+
+  $a->debug('Debug message');
+  $b->info('Info message');
+  $c->notice('Notice message');
+  $d->warning('Warning message');
+  $e->error('Error message');
+  $f->critical('Critical message');
+  $g->alert('Alert message');
+  $h->emergency('Emergency message');
+  $i->log(1, 'Log message');
+  $j->log('false positive');
+  $k->log($boo, 'Log message 2');
+  $l->log($another_false_positive);
+  $m->log(potx_test_8_sample(), 'Log message 3');
+  $n->log();
 }
 
 /**
@@ -52,6 +67,8 @@ class PotxTestD8 {
   function testFormatPlural() {
     $this->formatPlural($count, '1 formatPlural test string', '@count formatPlural test strings');
     $this->formatPlural($count, '1 formatPlural test string in context', '@count formatPlural test strings in context', array(), array('context' => 'Test context'));
+    $this->formatPlural($count);
+    $this->formatPlural();
 
     \Drupal::translation()->formatPlural($count, '1 translation->formatPlural test string in context', '@count translation->formatPlural test strings in context', array(), array('context' => 'Test context'));
     \Drupal::translation()->formatPlural($count, '1 translation->formatPlural test string', '@count translation->formatPlural test strings');

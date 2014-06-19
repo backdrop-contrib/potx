@@ -261,6 +261,18 @@ class PotxTestCase extends DrupalWebTestCase {
 
     $this->assertMsgID('TranslationWrapper string');
     $this->assertMsgIDContext('TranslationWrapper string with context', 'With context');
+
+    $this->assertMsgID('Debug message');
+    $this->assertMsgID('Info message');
+    $this->assertMsgID('Notice message');
+    $this->assertMsgID('Warning message');
+    $this->assertMsgID('Error message');
+    $this->assertMsgID('Critical message');
+    $this->assertMsgID('Alert message');
+    $this->assertMsgID('Emergency message');
+    $this->assertMsgID('Log message');
+    $this->assertMsgID('Log message 2');
+    $this->assertMsgID('Log message 3');
   }
 
   /**

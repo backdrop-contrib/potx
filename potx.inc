@@ -285,7 +285,20 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 
   if ($api_version > POTX_API_5) {
     // Watchdog calls have both of their arguments translated from Drupal 6.x.
+    // @todo Drupal 8 deprecated watchdog() but did not remove it yet.
     _potx_find_watchdog_calls($file_name, $save_callback);
+    if ($api_version > POTX_API_7) {
+      // Logging calls may use a colorful set of methods now.
+      _potx_find_t_calls($file_name, $save_callback, 'debug');
+      _potx_find_t_calls($file_name, $save_callback, 'info');
+      _potx_find_t_calls($file_name, $save_callback, 'notice');
+      _potx_find_t_calls($file_name, $save_callback, 'warning');
+      _potx_find_t_calls($file_name, $save_callback, 'error');
+      _potx_find_t_calls($file_name, $save_callback, 'critical');
+      _potx_find_t_calls($file_name, $save_callback, 'alert');
+      _potx_find_t_calls($file_name, $save_callback, 'emergency');
+      _potx_find_log_calls($file_name, $save_callback);
+    }
   }
   else {
     // Watchdog calls only have their first argument translated in Drupal 5.x
@@ -941,6 +954,59 @@ function _potx_find_watchdog_calls($file, $save_callback) {
 }
 
 /**
+ * Detect all occurances of log() calls.
+ *
+ * These sequences are searched for:
+ *   log + "(" + ..anything (might be more tokens).. +
+ *   "," + T_CONSTANT_ENCAPSED_STRING + whatever.
+ *
+ * @param $file
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ */
+function _potx_find_log_calls($file, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  if (isset($_potx_lookup['log'])) {
+    foreach ($_potx_lookup['log'] as $ti) {
+      list($ctok, $par1) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1]);
+      list($type, $string, $line) = $ctok;
+      if ($par1 == "(") {
+        // Eat up everything that is used as the first parameter
+        $tn = $ti + 2;
+        $depth = 0;
+        while (!($_potx_tokens[$tn] == "," && $depth == 0)) {
+          if ($_potx_tokens[$tn] == "(") {
+            $depth++;
+          }
+          elseif ($_potx_tokens[$tn] == ")") {
+            $depth--;
+          }
+          $tn++;
+          if ($depth < 0) {
+            // There is no second argument. This log() call was a false
+            // positive, continue with the next one.
+            continue 2;
+          }
+        }
+        // Get further parameters
+        list($comma, $message, $par2) = array($_potx_tokens[$tn], $_potx_tokens[$tn+1], $_potx_tokens[$tn+2]);
+        if (($comma == ',') && in_array($par2, array(')', ',')) &&
+          (is_array($message) && ($message[0] == T_CONSTANT_ENCAPSED_STRING))) {
+          // Context is not supported on watchdog().
+          $save_callback(_potx_format_quoted_string($message[1]), POTX_CONTEXT_NONE, $file, $line);
+        }
+        else {
+          // log() found, but the parameters are not correct.
+          _potx_marker_error($file, $line, 'log', $ti, t('In log(), the log level should be followed by a literal string. There should be no variables, concatenation, constants or even a t() call there.'), 'http://drupal.org/node/323101');
+        }
+      }
+    }
+  }
+}
+
+/**
  * Detect all occurances of format_plural calls.
  *
  * These sequences are searched for:
@@ -978,6 +1044,11 @@ function _potx_find_format_plural_calls($file, $save_callback, $function_name = 
             $depth--;
           }
           $tn++;
+          if ($depth < 0) {
+            // There is no second argument. This $function_name() call was a
+            // false positive, continue with the next one.
+            continue 2;
+          }
         }
         // Get further parameters
         list($comma1, $singular, $comma2, $plural, $par2) = array($_potx_tokens[$tn], $_potx_tokens[$tn+1], $_potx_tokens[$tn+2], $_potx_tokens[$tn+3], $_potx_tokens[$tn+4]);
