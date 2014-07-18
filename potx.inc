@@ -1866,12 +1866,12 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
   elseif (substr($file_name, -12) === '.routing.yml') {
     _potx_find_routing_yml_file_strings($code, $file_name, $save_callback);
   }
-  elseif (substr($file_name, -16) === '.local_tasks.yml' ||
-          substr($file_name, -18) === '.local_actions.yml' ||
-          substr($file_name, -21) === '.contextual_links.yml') {
+  elseif (substr($file_name, -15) === '.links.task.yml' ||
+          substr($file_name, -17) === '.links.action.yml' ||
+          substr($file_name, -21) === '.links.contextual.yml') {
     _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_callback);
   }
-  elseif (substr($file_name, -15) === '.menu_links.yml') {
+  elseif (substr($file_name, -15) === '.links.menu.yml') {
     _potx_find_menu_links_yml_file_strings($code, $file_name, $save_callback);
   }
   // Handle configuration schema files, found in config/schema directories.
@@ -1948,7 +1948,7 @@ function _potx_find_routing_yml_file_strings($code, $file_name, $save_callback, 
 }
 
 /**
- * Parse a .local_tasks.yml, .local_actions.yml, or .contextual_links.yml file, and add relevant strings to the list.
+ * Parse a .links.task.yml, .links.action.yml, or .links.contextual.yml file, and add relevant strings to the list.
  */
 function _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
   $info = Yaml::parse($code);
@@ -1968,7 +1968,7 @@ function _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_c
 }
 
 /**
- * Parse a .menu_links.yml file, and add relevant strings to the list.
+ * Parse a .links.menu.yml file, and add relevant strings to the list.
  */
 function _potx_find_menu_links_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
   $info = Yaml::parse($code);

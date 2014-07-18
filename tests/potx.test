@@ -306,9 +306,9 @@ class PotxTestCase extends DrupalWebTestCase {
    */
   public function testDrupal8LocalContextualYml() {
     $filenames = array(
-      drupal_get_path('module', 'potx'). '/tests/potx_test_8.local_tasks.yml',
-      drupal_get_path('module', 'potx'). '/tests/potx_test_8.local_actions.yml',
-      drupal_get_path('module', 'potx'). '/tests/potx_test_8.contextual_links.yml'
+      drupal_get_path('module', 'potx'). '/tests/potx_test_8.links.task.yml',
+      drupal_get_path('module', 'potx'). '/tests/potx_test_8.links.action.yml',
+      drupal_get_path('module', 'potx'). '/tests/potx_test_8.links.contextual.yml'
     );
 
     $this->parseFile($filenames[0], POTX_API_8);
@@ -331,7 +331,7 @@ class PotxTestCase extends DrupalWebTestCase {
    * Test parsing of Drupal 8 menu link files.
    */
   public function testDrupal8MenuLinksYml() {
-    $this->parseFile(drupal_get_path('module', 'potx'). '/tests/potx_test_8.menu_links.yml', POTX_API_8);
+    $this->parseFile(drupal_get_path('module', 'potx'). '/tests/potx_test_8.links.menu.yml', POTX_API_8);
     $this->assertMsgID('Test menu link title');
     $this->assertMsgID('Test menu link description.');
     $this->assertMsgIDContext('Test menu link title with context', 'Menu item context');
