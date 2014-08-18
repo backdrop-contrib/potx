@@ -1855,139 +1855,72 @@ function _potx_find_translation_annotations($file, $save_callback) {
   }
 }
 
+function _potx_init_translation_patterns() {
+  global $yaml_translation_patterns;
+
+  $content = Yaml::parse(file_get_contents(drupal_get_path('module', 'potx') . '/yaml_translation_patterns.yml'));
+
+  foreach ($content as $pattern => $list) {
+    foreach ($list as $value) {
+      if (is_array($value)) {
+        foreach ($value as $key => $context) {
+          $yaml_translation_patterns[$pattern]['keys'][] = $key;
+          $yaml_translation_patterns[$pattern]['contexts'][$key] = $context['context'];
+        }
+      }
+      else {
+        $yaml_translation_patterns[$pattern]['keys'][] = $value;
+      }
+    }
+  }
+}
+
 /**
  * Parse a YAML file for translatables. Drupal 8+.
  */
 function _potx_parse_yaml_file($code, $file_name, $save_callback) {
-  // Handle .info.yml files.
-  if (substr($file_name, -9) === '.info.yml') {
-    _potx_find_info_yml_file_strings($code, $file_name, $save_callback);
-  }
-  elseif (substr($file_name, -12) === '.routing.yml') {
-    _potx_find_routing_yml_file_strings($code, $file_name, $save_callback);
-  }
-  elseif (substr($file_name, -15) === '.links.task.yml' ||
-          substr($file_name, -17) === '.links.action.yml' ||
-          substr($file_name, -21) === '.links.contextual.yml') {
-    _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_callback);
-  }
-  elseif (substr($file_name, -15) === '.links.menu.yml') {
-    _potx_find_menu_links_yml_file_strings($code, $file_name, $save_callback);
-  }
-  // Handle configuration schema files, found in config/schema directories.
-  elseif (preg_match('~config/schema/[^/]+\.schema\.yml$~', $file_name)) {
-    $schema = Yaml::parse($code);
-    _potx_find_config_schema_labels($schema, $file_name, $save_callback);
-  }
-}
+  global $yaml_translation_patterns;
 
-/**
- * Recursively extract 'label' values from a configuration schema array.
- */
-function _potx_find_config_schema_labels($schema, $file_name, $save_callback) {
-  foreach ($schema as $key => $value) {
-    if (is_array($value)) {
-      _potx_find_config_schema_labels($value, $file_name, $save_callback);
-    }
-    elseif ($key == 'label') {
-      $save_callback(addcslashes($value, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+  if (!isset($yaml_translation_patterns)) {
+    _potx_init_translation_patterns();
+  }
+
+  foreach ($yaml_translation_patterns as $pattern => $trans_list) {
+    if (fnmatch($pattern, $file_name) || fnmatch('*/' . $pattern, $file_name)) {
+      $yaml = Yaml::parse($code);
+      _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback);
     }
   }
 }
 
-/**
- * Parse a .info.yml file and add relevant strings to the list.
- */
-function _potx_find_info_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
-  $info = Yaml::parse($code);
+function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback) {
+  foreach ($yaml as $key => $value) {
 
-  // We need the name, description and package values. Others,
-  // like core and PHP compatibility, timestamps or versions
-  // are not to be translated.
-  foreach (array('name', 'description', 'package') as $key) {
-    if (isset($info[$key])) {
-      // No context support for .info.yml file strings.
-      $save_callback(addcslashes($info[$key], "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
-    }
-  }
-
-  // Add region names from themes.
-  if (isset($info['regions']) && is_array($info['regions'])) {
-    foreach ($info['regions'] as $region => $region_name) {
-      // No context support for .info.yml file strings.
-      $save_callback(addcslashes($region_name, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
-    }
-  }
-}
-
-/**
- * Parse a .routing.yml file and add relevant strings to the list.
- */
-function _potx_find_routing_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
-  $info = Yaml::parse($code);
-
-  // Route item titles are provided as a defaults subkey on the route,
-  // and can optionally include a context subkey:
-  // route_name:
-  //   defaults:
-  //     _title: 'Route title'
-  //     _title_context: 'Title context'
-  // Just take all _title key values on this nesting level.
-  foreach ($info as $route => $route_data) {
-    foreach ($route_data as $key => $value) {
-      if (is_array($value) && array_key_exists('_title', $value)) {
-        if (array_key_exists('_title_context', $value)) {
-          $save_callback($value['_title'], $value['_title_context'], $file_name);
+    if (in_array($key, $trans_list['keys'], TRUE)) {
+      if (isset($trans_list['contexts'][$key])) {
+        $context_key = $trans_list['contexts'][$key];
+        if (isset($yaml[$context_key])) {
+          $context = $yaml[$context_key];
         }
         else {
-          $save_callback($value['_title'], POTX_CONTEXT_NONE, $file_name);
+          $context = POTX_CONTEXT_NONE;
         }
       }
-    }
-  }
-}
+      else {
+        $context = POTX_CONTEXT_NONE;
+      }
 
-/**
- * Parse a .links.task.yml, .links.action.yml, or .links.contextual.yml file, and add relevant strings to the list.
- */
-function _potx_find_local_contextual_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
-  $info = Yaml::parse($code);
-
-  // Local tasks, local actions, and contextual links contain a title and an
-  // optional title_context, which should be translated.
-  foreach ($info as $key => $value) {
-    if (is_array($value) && array_key_exists('title', $value)) {
-      if (array_key_exists('title_context', $value)) {
-        $save_callback($value['title'], $value['title_context'], $file_name);
+      if (is_array($value)) {
+        foreach ($value as $item) {
+          $save_callback(addcslashes($item, "\0..\37\\\""), $context, $file_name);
+        }
       }
       else {
-        $save_callback($value['title'], POTX_CONTEXT_NONE, $file_name);
+        $save_callback(addcslashes($value, "\0..\37\\\""), $context, $file_name);
       }
     }
-  }
-}
-
-/**
- * Parse a .links.menu.yml file, and add relevant strings to the list.
- */
-function _potx_find_menu_links_yml_file_strings($code, $file_name, $save_callback, $api_version = POTX_API_CURRENT) {
-  $info = Yaml::parse($code);
-
-  // Menu links contain a title and an optional title_context, as well as an
-  // optional description, which should be translated.
-  foreach ($info as $key => $value) {
-    if (is_array($value) && array_key_exists('title', $value)) {
-      // Title context is pending on https://drupal.org/node/2119551, but added
-      // here already.
-      if (array_key_exists('title_context', $value)) {
-        $save_callback($value['title'], $value['title_context'], $file_name);
-      }
-      else {
-        $save_callback($value['title'], POTX_CONTEXT_NONE, $file_name);
-      }
-    }
-    if (is_array($value) && array_key_exists('description', $value)) {
-      $save_callback($value['description'], POTX_CONTEXT_NONE, $file_name);
+    elseif (is_array($value)) {
+      _potx_find_yaml_translatables($value, $trans_list, $file_name, $save_callback);
     }
   }
 }
