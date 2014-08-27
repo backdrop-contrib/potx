@@ -1855,10 +1855,51 @@ function _potx_find_translation_annotations($file, $save_callback) {
   }
 }
 
-function _potx_init_translation_patterns() {
+/**
+ * Initialize the list of translation patterns for YAML files.
+ *
+ * The patterns are loaded from a file named "yaml_translation_patterns.yml" in
+ * potx's root. Contrib projects can also include their own
+ * "yaml_translation_patterns.yml" file in their root folder to specify
+ * translatable strings in their own custom yaml files.
+ *
+ * @param string $path
+ *   The path to look for a custom "yaml_translation_patterns.yml" file.
+ */
+function _potx_init_yaml_translation_patterns($path = '') {
+  global $yaml_translation_patterns;
+  $yaml_translation_patterns = array();
+
+  $default_patterns = drupal_get_path('module', 'potx') . '/yaml_translation_patterns.yml';
+  _potx_load_yaml_translation_patterns($default_patterns);
+
+  $custom_patterns = $path . '/yaml_translation_patterns.yml';
+  if (!empty($path) && file_exists($custom_patterns)) {
+    _potx_load_yaml_translation_patterns($custom_patterns);
+  }
+}
+
+/**
+ * Load the list of YAML translation patterns from a file.
+ *
+ * The file is expected to be in the following format:
+ * @code
+ *   # A list of file matching patterns (as expected by fnmatch()).
+ *   *.test_format.yml:
+ *     # A sequence of translatable keys in the matched YAML files.
+ *     - test_label
+ *     - test_label_2:
+ *         # An optional key, used as context for the translatable string.
+ *         context: label_2_context
+ * @endcode
+ *
+ * @param string $path
+ *   The path for the YAML translation patterns file.
+ */
+function _potx_load_yaml_translation_patterns($path) {
   global $yaml_translation_patterns;
 
-  $content = Yaml::parse(file_get_contents(drupal_get_path('module', 'potx') . '/yaml_translation_patterns.yml'));
+  $content = Yaml::parse(file_get_contents($path));
 
   foreach ($content as $pattern => $list) {
     foreach ($list as $value) {
@@ -1882,7 +1923,7 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
   global $yaml_translation_patterns;
 
   if (!isset($yaml_translation_patterns)) {
-    _potx_init_translation_patterns();
+    _potx_init_yaml_translation_patterns();
   }
 
   foreach ($yaml_translation_patterns as $pattern => $trans_list) {
@@ -1893,6 +1934,14 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
   }
 }
 
+/**
+ * Recursively look for translatable strings in a YAML file.
+ *
+ * @param array $yaml
+ *   The parsed YAML data.
+ * @param array $trans_list
+ *   The list of translatable keys to look for, and (optionally) their contexts.
+ */
 function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback) {
   foreach ($yaml as $key => $value) {
 
@@ -1995,6 +2044,7 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   if ($api_version > POTX_API_7) {
     $extensions[] = 'twig';
     $extensions[] = 'yml';
+    _potx_init_yaml_translation_patterns($path);
   }
   $files = array();
   foreach ($extensions as $extension) {
