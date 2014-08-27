@@ -1920,6 +1920,8 @@ function _potx_init_yaml_translation_patterns($path = '') {
  *     - test_label_2:
  *         # An optional key, used as context for the translatable string.
  *         context: label_2_context
+ *     # To mark all top-level keys as translatable, use the '%top-level-key' string.
+ *     - %top-level-key
  * @endcode
  *
  * @param string $path
@@ -1972,6 +1974,12 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
  *   The list of translatable keys to look for, and (optionally) their contexts.
  */
 function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback) {
+  $extract_values = FALSE;
+  if (in_array('%top-level-key', $trans_list['keys'], TRUE)) {
+    $extract_values = TRUE;
+    $trans_list['keys'] = array_diff($trans_list['keys'], array('%top-level-key'));
+  }
+
   foreach ($yaml as $key => $value) {
 
     if (in_array($key, $trans_list['keys'], TRUE)) {
@@ -1999,6 +2007,9 @@ function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_cal
     }
     elseif (is_array($value)) {
       _potx_find_yaml_translatables($value, $trans_list, $file_name, $save_callback);
+    }
+    elseif ($extract_values) {
+      $save_callback(addcslashes($value, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
     }
   }
 }

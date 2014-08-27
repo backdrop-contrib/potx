@@ -359,6 +359,16 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Test parsing of Drupal 8 permissions files.
+   */
+  public function testDrupal8PermissionsYml() {
+    $this->parseFile(drupal_get_path('module', 'potx'). '/tests/potx_test_8.permissions.yml', POTX_API_8);
+    $this->assertMsgID('Title potx_test_8_a');
+    $this->assertMsgID('Description: potx_test_8_a');
+    $this->assertMsgID('Title potx_test_8_b');
+  }
+
+  /**
    * Test parsing of Drupal 8 configuration schema files.
    */
   public function testDrupal8ConfigurationSchema() {

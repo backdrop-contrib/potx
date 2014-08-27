@@ -22,5 +22,9 @@
 *.breakpoints.yml:
   - label
   - group
+*.permissions.yml:
+  - title
+  - description
+  - %top-level-key
 config/schema/*.yml:
   - label
