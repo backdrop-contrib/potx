@@ -19,5 +19,8 @@
   - title:
       context: title_context
   - description
+*.breakpoints.yml:
+  - label
+  - group
 config/schema/*.yml:
   - label

@@ -348,6 +348,17 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Test parsing of Drupal 8 .breakpoints.yml files.
+   */
+  public function testDrupal8BreakpointsYml() {
+    $filename = drupal_get_path('module', 'potx'). '/tests/potx_test_8.breakpoints.yml';
+    $this->parseFile($filename, POTX_API_8);
+    $this->assertMsgID('Mobile');
+    $this->assertMsgID('Standard');
+    $this->assertMsgID('Some breakpoint group');
+  }
+
+  /**
    * Test parsing of Drupal 8 configuration schema files.
    */
   public function testDrupal8ConfigurationSchema() {
