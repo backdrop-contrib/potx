@@ -6,11 +6,11 @@
  */
 
 /**
- * Doing something amazing. Don't really care for all the details of
- * annotations really.
- *
- * @Translation("Good translation annotation")
- * @Translation("Translation in good context", context="Translation test")
+ * @TestAnnotation(
+ *   id = "test_annotation",
+ *   test_label = @Translation("Good translation annotation"),
+ *   test_label_context = @Translation("Translation in good context", context="Translation test")
+ * )
  */
 function potx_test_8_example() {
   $a = new TranslationWrapper('TranslationWrapper string');
@@ -33,14 +33,14 @@ function potx_test_8_example() {
 }
 
 /**
- * Doing something amazing. Don't really care for all the details of
- * annotations really, but we catch errors.
+ * Let's see if we catch errors in @Translation() annotation.
  *
- * @Translation("Bad translation annotation)
- * @Translation(Worse translation annotation)
- * @Translation("Another good translation annotation")
- * @Translation Even worse
- * @Translation("Final good translation annotation")
+ * @TestAnnotation2(
+ *   test_1 = @Translation("Bad translation annotation),
+ *   test_2 = @Translation("Another good translation annotation"),
+ *   test_3 = @Translation Even worse,
+ *   test_4 = @Translation("Final good translation annotation"),
+ * )
  */
 function potx_test_8_sample() {
 }
@@ -48,7 +48,9 @@ function potx_test_8_sample() {
 /**
  * Empty annotations are not allowed either.
  *
- * @Translation("")
+ * @TestAnnotation3(
+ *   test = @Translation("")
+ * )
  */
 function potx_test_8_empty() {
 }

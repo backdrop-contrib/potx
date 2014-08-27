@@ -845,8 +845,17 @@ function _potx_find_t_calls($file, $save_callback, $function_name = 't', $string
   // Lookup tokens by function name.
   if (isset($_potx_lookup[$function_name])) {
     foreach ($_potx_lookup[$function_name] as $ti) {
-      list($ctok, $par, $mid, $rig) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3]);
+      list($prev, $ctok, $par, $mid, $rig) = array($_potx_tokens[$ti - 1], $_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3]);
       list($type, $string, $line) = $ctok;
+
+      if (is_array($prev) && $prev[0] == T_FUNCTION) {
+        continue;
+      }
+
+      if ($function_name == 'debug' && is_array($prev) && $prev[0] != T_OBJECT_OPERATOR) {
+        continue;
+      }
+
       if ($par == "(") {
         if (in_array($rig, array(")", ","))
           && (is_array($mid) && ($mid[0] == T_CONSTANT_ENCAPSED_STRING))) {
@@ -889,8 +898,13 @@ function _potx_find_t_calls_with_context($file, $save_callback, $function_name =
   // Lookup tokens by function name.
   if (isset($_potx_lookup[$function_name])) {
     foreach ($_potx_lookup[$function_name] as $ti) {
-      list($ctok, $par, $mid, $rig) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3]);
+      list($prev, $ctok, $par, $mid, $rig) = array($_potx_tokens[$ti - 1], $_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3]);
       list($type, $string, $line) = $ctok;
+
+      if (is_array($prev) && $prev[0] == T_FUNCTION) {
+        continue;
+      }
+
       if ($par == "(") {
         if (in_array($rig, array(")", ","))
           && (is_array($mid) && ($mid[0] == T_CONSTANT_ENCAPSED_STRING))) {
@@ -933,8 +947,13 @@ function _potx_find_watchdog_calls($file, $save_callback) {
   // Lookup tokens by function name.
   if (isset($_potx_lookup['watchdog'])) {
     foreach ($_potx_lookup['watchdog'] as $ti) {
-      list($ctok, $par, $mtype, $comma, $message, $rig) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3], $_potx_tokens[$ti+4], $_potx_tokens[$ti+5]);
+      list($prev, $ctok, $par, $mtype, $comma, $message, $rig) = array($_potx_tokens[$ti - 1], $_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3], $_potx_tokens[$ti+4], $_potx_tokens[$ti+5]);
       list($type, $string, $line) = $ctok;
+
+      if (is_array($prev) && $prev[0] == T_FUNCTION) {
+        continue;
+      }
+
       if ($par == '(') {
         // Both type and message should be a string literal.
         if (in_array($rig, array(')', ',')) && $comma == ','
@@ -970,8 +989,13 @@ function _potx_find_log_calls($file, $save_callback) {
 
   if (isset($_potx_lookup['log'])) {
     foreach ($_potx_lookup['log'] as $ti) {
-      list($ctok, $par1) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1]);
+      list($prev, $ctok, $par1) = array($_potx_tokens[$ti - 1], $_potx_tokens[$ti], $_potx_tokens[$ti+1]);
       list($type, $string, $line) = $ctok;
+
+      if (is_array($prev) && $prev[0] == T_FUNCTION) {
+        continue;
+      }
+
       if ($par1 == "(") {
         // Eat up everything that is used as the first parameter
         $tn = $ti + 2;
@@ -1030,8 +1054,13 @@ function _potx_find_format_plural_calls($file, $save_callback, $function_name = 
 
   if (isset($_potx_lookup[$function_name])) {
     foreach ($_potx_lookup[$function_name] as $ti) {
-      list($ctok, $par1) = array($_potx_tokens[$ti], $_potx_tokens[$ti+1]);
+      list($prev, $ctok, $par1) = array($_potx_tokens[$ti - 1], $_potx_tokens[$ti], $_potx_tokens[$ti+1]);
       list($type, $string, $line) = $ctok;
+
+      if (is_array($prev) && $prev[0] == T_FUNCTION) {
+        continue;
+      }
+
       if ($par1 == "(") {
         // Eat up everything that is used as the first parameter
         $tn = $ti + 2;
@@ -1828,7 +1857,7 @@ function _potx_find_translation_annotations($file, $save_callback) {
       // Match for a possible empty string too, so we can signal that kind of
       // error in our standard way (from the save callback), instead of signaling
       // a generic error from here around syntax.
-      preg_match_all('!@Translation\(\s*"([^"]*)"(\s*,\s*context\s*=\s*("[^"]+"))?\s*\)!', $string, $found);
+      preg_match_all('!=\s*@Translation\(\s*"([^"]*)"(\s*,\s*context\s*=\s*("[^"]+"))?\s*\)!', $string, $found);
       if (isset($found) && is_array($found) && count($found[1])) {
 
         foreach ($found[1] as $index => $match) {
@@ -1846,7 +1875,7 @@ function _potx_find_translation_annotations($file, $save_callback) {
           $string = str_replace($found[0][$index], '', $string);
         }
       }
-      if (strpos($string, '@Translation')) {
+      if (preg_match('!=\s*@Translation!', $string) === 1) {
         // @Translation annotations still exist, so we have ones that did not
         // match the expected pattern.
         _potx_marker_error($file, $line, "@Translation", $ti, t('In @Translation, only one, non-empty static string is allowed in double quotes.'), 'https://drupal.org/node/1882526');
@@ -1991,6 +2020,10 @@ function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_cal
  */
 function _potx_find_constraint_messages($file_name, $save_callback) {
   global $_potx_tokens, $_potx_lookup;
+
+  if (!isset($_potx_lookup['T_POTX_CONSTRAINT'])) {
+    return;
+  }
 
   foreach ($_potx_lookup['T_POTX_CONSTRAINT'] as $key => $ti) {
 
