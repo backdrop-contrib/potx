@@ -369,27 +369,71 @@ class PotxTestCase extends DrupalWebTestCase {
   }
 
   /**
-   * Test parsing of Drupal 8 configuration schema files.
+   * Test parsing of Drupal 8 shipped configuration files.
    */
-  public function testDrupal8ConfigurationSchema() {
-    $filename = drupal_get_path('module', 'potx') .'/tests/drupal8/config/schema/test.schema.yml';
-    $this->parseFile($filename, POTX_API_8);
+  public function testDrupal8ShippedConfiguration() {
+
+    global $_potx_store, $_potx_strings, $_potx_install;
+    $_potx_store = $_potx_strings = $_potx_install = array();
+    $test_d8_path = drupal_get_path('module', 'potx') . '/tests/drupal8';
+    $files = _potx_explore_dir($test_d8_path, '*', POTX_API_8, TRUE);
+
+    foreach ($files as $file) {
+      _potx_process_file($file, 0, '_potx_save_string', '_potx_save_version', POTX_API_8);
+    }
+
+    _potx_parse_shipped_configuration('_potx_save_string', POTX_API_8);
+
+    $this->buildOutput(POTX_API_8);
+
+    for ($i = 1; $i < 8; $i++) {
+      $this->assertNoMsgID($i . '');
+    }
+
+    // Test extraction of config schema labels.
 
     // Make sure all the 'label' strings are extracted.
-    $this->assertMsgID('Label');
-    $this->assertMsgID('Test settings');
-    $this->assertMsgID('Test string with "quotes"');
-    $this->assertMsgID('Test boolean');
     $this->assertMsgID('Test integer');
-    $this->assertMsgID('Test sequence');
-    $this->assertMsgID('Test sequence 2');
-    $this->assertMsgID('Test string 2');
-    $this->assertMsgID('Test mapping');
-    $this->assertMsgID('Test string 3');
+    $this->assertMsgID('Test string with "quotes"');
+    $this->assertMsgID('Mapping integer');
+    $this->assertMsgID('Test string in sequence');
 
     // Make sure other strings are not extracted.
     $this->assertNoMsgID('mapping');
     $this->assertNoMsgID('sequence');
+
+    // Test extraction of shipped config translatables.
+
+    $this->assertMsgID('A string with "translatable: true" property');
+    $this->assertMsgIDContext('Y-m-d', 'PHP date format');
+    $this->assertMsgIDContext('Test string with context', 'Test context');
+    $this->assertMsgIDContext('Test label with context', 'Test label with context');
+    $this->assertMsgIDContext('Test overriding context', 'Test context override');
+    $this->assertMsgID('Simple mapping name');
+    $this->assertMsgID('Simple mapping code');
+    $this->assertMsgID('Mapping with type - name');
+    $this->assertMsgID('Mapping with type - code');
+    $this->assertMsgID('Mapping with type - extra label');
+    $this->assertMsgID('Simple sequence - Item 1');
+    $this->assertMsgID('Simple sequence - Item 2');
+    $this->assertMsgID('Typed sequence - Item 1 name');
+    $this->assertMsgID('Typed sequence - Item 1 code');
+    $this->assertMsgID('Typed sequence - Item 2 name');
+    $this->assertMsgID('Typed sequence - Item 2 code');
+    $this->assertMsgID('Sequence of sequence - Description 1');
+    $this->assertMsgID('Sequence of sequence - Description 2');
+    $this->assertMsgID('Basic variable (text)');
+    $this->assertMsgID('Parent variable (text)');
+    $this->assertMsgID('Key variable (text)');
+    $this->assertMsgID('Complex variable test');
+
+    $this->assertNoMsgID('A simple string');
+    $this->assertNoMsgID('A text with "translatable: false" property');
+    $this->assertNoMsgID('text');
+    $this->assertNoMsgID('custom');
+    $this->assertNoMsgID('Basic variable (custom)');
+    $this->assertNoMsgID('Parent variable (custom)');
+    $this->assertNoMsgID('Key variable (custom)');
   }
 
   /**
@@ -460,7 +504,22 @@ class PotxTestCase extends DrupalWebTestCase {
     //debug(var_export($this->potx_output, TRUE));
     $this->potx_status = potx_status('get', TRUE);
     //debug(var_export($this->potx_status, TRUE));
-}
+  }
+
+  /**
+   * Build the output from parsed files.
+   */
+  private function buildOutput($api_version, $string_mode = POTX_STRING_RUNTIME)
+  {
+    potx_status('set', POTX_STATUS_STRUCTURED);
+    _potx_build_files($string_mode, POTX_BUILD_SINGLE, 'general', '_potx_save_string', '_potx_save_version', '_potx_get_header', NULL, NULL, $api_version);
+
+    // Grab .po representation of parsed content.
+    ob_start();
+    _potx_write_files('potx-test.po');
+    $this->potx_output = ob_get_clean();
+    $this->potx_status = potx_status('get', TRUE);
+  }
 
   /**
    * Helper function to assert an msgid construct in the .po file.

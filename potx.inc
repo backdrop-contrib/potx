@@ -202,7 +202,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     return;
   }
   elseif ($name_parts['extension'] == 'yml' && $api_version > POTX_API_7) {
-    _potx_parse_yaml_file($code, $file_name, $save_callback);
+    _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback);
   }
   elseif ($name_parts['extension'] == 'js' && $api_version > POTX_API_5) {
     // @todo: D7 context support.
@@ -1950,8 +1950,9 @@ function _potx_load_yaml_translation_patterns($path) {
 /**
  * Parse a YAML file for translatables. Drupal 8+.
  */
-function _potx_parse_yaml_file($code, $file_name, $save_callback) {
+function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
   global $yaml_translation_patterns;
+  global $_potx_config_set;
 
   if (!isset($yaml_translation_patterns)) {
     _potx_init_yaml_translation_patterns();
@@ -1962,6 +1963,16 @@ function _potx_parse_yaml_file($code, $file_name, $save_callback) {
       $yaml = Yaml::parse($code);
       _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback);
     }
+  }
+
+  if (preg_match('~config/schema/[^/]+\.yml$~', $file_name)) {
+    $schema = Yaml::parse($code);
+    foreach ($schema as $key => $element) {
+      _potx_process_config_schema($key, $element);
+    }
+  }
+  elseif (preg_match('~config/install/[^/]+\.yml$~', $file_name)) {
+    $_potx_config_set[] = $file_path;
   }
 }
 
@@ -2010,6 +2021,412 @@ function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_cal
     }
     elseif ($extract_values) {
       $save_callback(addcslashes($value, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);
+    }
+  }
+}
+
+/**
+ * Recursively process config schema into a flat structure.
+ *
+ * This structure is used to extract translatable strings from shipped
+ * configuration, and identifies every element by joining all of its parent keys
+ * (including itself) separated by the '+' symbol. It stores the schema elements
+ * in four sublists:
+ *  'translatables': the list of elements that are translatable.
+ *  'types': the list of elements that rely on other schema elements for their
+ *    definition. generally, those with types other than "mapping".
+ *  'mappings': the list of elements that have a defined "mapping" property.
+ *  'contexts': the list of elements that have a defined context string, using
+ *    the "translation context" property.
+ *
+ * Note that 'types' and 'mappings' lists are not exclusive, i.e. an element can
+ * both have a 'type' definition and a separate 'mapping'.
+ *
+ * Here is an example config schema:
+ * @code
+ *   test_schema:
+ *     type: mapping
+ *     mapping:
+ *       name:
+ *         type: label
+ *       content:
+ *         type: text
+ *         translation context: Test schema content
+ *       test_filter:
+ *         type: filter
+ * @endcode
+ *
+ * And the resulting processed schema:
+ * @code
+ * Array
+ * (
+ *   [translatables] => Array
+ *     (
+ *       [0] => test_schema+name
+ *       [1] => test_schema+content
+ *     )
+ *
+ *   [types] => Array
+ *     (
+ *       [test_schema+test_filter] => filter
+ *     )
+ *
+ *   [mappings] => Array
+ *     (
+ *       [0] => test_schema
+ *     )
+ *
+ *   [contexts] => Array
+ *     (
+ *       [test_schema+content] => Test schema content
+ *     )
+ *
+ * )
+ * @endcode
+ *
+ * @param string $schema_prefix
+ *   All parent keys (including the element's key) joined by '+' symbol, e.g.
+ *   image.style.*+effects+sequence
+ * @param array $schema_data
+ *   The schema subtree belonging to the current element.
+ */
+function _potx_process_config_schema($schema_prefix, $schema_data) {
+  global $_potx_processed_schema;
+
+  if (!isset($_potx_processed_schema)) {
+    // The initial values for 'translatables' allows a limited support for
+    // extracting translatable strings from contrib projects, until
+    // https://www.drupal.org/node/1933988 gets in.
+    $_potx_processed_schema = array(
+      'translatables' => array('label', 'text', 'date_format'),
+      'types' => array(),
+      'mappings' => array(),
+      'contexts' => array('date_format' => 'PHP date format'),
+    );
+  }
+
+  // Elements can opt out of translation with a 'translatable: false' key.
+  if (isset($schema_data['translatable']) && $schema_data['translatable'] === FALSE) {
+    return;
+  }
+
+  // Do not process elements without a type, since the locale module strictly
+  // requires translatable elements to be of base type 'string', and also we
+  // can't traverse an element without knowing its type.
+  if (!isset($schema_data['type'])) {
+    return;
+  }
+
+  $type = $schema_data['type'];
+
+  if (isset($schema_data['mapping'])) {
+
+    foreach ($schema_data['mapping'] as $key => $element_data) {
+      $element_key = $schema_prefix . '+' . $key;
+      _potx_process_config_schema($element_key, $element_data);
+    }
+
+    if ($type != 'mapping') {
+      $_potx_processed_schema['types'][$schema_prefix] = $type;
+    }
+
+    $_potx_processed_schema['mappings'][] = $schema_prefix;
+  }
+  else {
+    if ($type == 'sequence') {
+      _potx_process_config_schema($schema_prefix . '+sequence', $schema_data['sequence'][0]);
+      $_potx_processed_schema['types'][$schema_prefix] = 'sequence';
+    }
+    // If the element's type is in the "translatables" list, or it has a
+    // 'translatable: true' key, then it is translatable.
+    elseif (in_array($type, $_potx_processed_schema['translatables'])
+            || (isset($schema_data['translatable'])
+                && $schema_data['translatable'] === TRUE)) {
+      $_potx_processed_schema['translatables'][] = $schema_prefix;
+
+      // Elements can define a context string, or inherit the context from their
+      // defined type.
+      if (isset($schema_data['translation context'])) {
+        $_potx_processed_schema['contexts'][$schema_prefix] = $schema_data['translation context'];
+      }
+      elseif (isset($_potx_processed_schema['contexts'][$type])) {
+        $_potx_processed_schema['contexts'][$schema_prefix] = $_potx_processed_schema['contexts'][$type];
+      }
+    }
+    else {
+      $_potx_processed_schema['types'][$schema_prefix] = $type;
+    }
+  }
+}
+
+/**
+ * Checks whether an element exists in the processed schema.
+ *
+ * @param string $type
+ * @return boolean
+ */
+function _potx_element_has_schema($type) {
+  global $_potx_processed_schema;
+
+  // If an element doesn't exist in any of the extracted lists, it hasn't been
+  // defined in schema. This is checked during processing shipped config.
+  return in_array($type, $_potx_processed_schema['translatables'])
+         || in_array($type, $_potx_processed_schema['mappings'])
+         || isset($_potx_processed_schema['types'][$type]);
+}
+
+/**
+ * Find the schema element matching with a specific type.
+ *
+ * Based on Drupal\Core\Config\TypedConfigManager::getFallbackName($name)
+ *
+ * @param string $name
+ *   Configuration name or key.
+ *
+ * @return null|string
+ *   The resolved schema name for the given configuration name or key. Returns
+ *   null if there is no schema name to fallback to. For example,
+ *   breakpoint.breakpoint.module.toolbar.narrow will check for definitions in
+ *   the following order:
+ *     breakpoint.breakpoint.module.toolbar.*
+ *     breakpoint.breakpoint.module.*.*
+ *     breakpoint.breakpoint.module.*
+ *     breakpoint.breakpoint.*.*.*
+ *     breakpoint.breakpoint.*
+ *     breakpoint.*.*.*.*
+ *     breakpoint.*
+ *   Colons are also used, for example,
+ *   block.settings.system_menu_block:footer will check for definitions in the
+ *   following order:
+ *     block.settings.system_menu_block:*
+ *     block.settings.*:*
+ *     block.settings.*
+ *     block.*.*:*
+ *     block.*
+ */
+function _potx_find_matching_schema($name) {
+  global $_potx_processed_schema;
+
+  if (_potx_element_has_schema($name)) {
+    return $name;
+  }
+
+  // Check for definition of $name with filesystem marker.
+  $replaced = preg_replace('/([^.:]+)([.:*]*)$/', '*\2', $name);
+  if ($replaced != $name ) {
+    if (_potx_element_has_schema($replaced)) {
+      return $replaced;
+    }
+    else {
+      // No definition for this level. Collapse multiple wildcards to a single
+      // wildcard to see if there is a greedy match. For example,
+      // breakpoint.breakpoint.*.* becomes
+      // breakpoint.breakpoint.*
+      $one_star = preg_replace('/\.([:.*]*)$/', '.*', $replaced);
+      if ($one_star != $replaced && _potx_element_has_schema($one_star)) {
+        return $one_star;
+      }
+      // Check for next level. For example, if breakpoint.breakpoint.* has
+      // been checked and no match found then check breakpoint.*.*
+      return _potx_find_matching_schema($replaced);
+    }
+  }
+}
+
+/**
+ * Replaces variables in configuration name.
+ *
+ * The configuration name may contain one or more variables to be replaced,
+ * enclosed in square brackets like '[name]' and will follow the replacement
+ * rules defined by the _potx_replace_variable() function.
+ *
+ * Based on Drupal\Core\Config\TypedConfigManager::replaceName($name, $data)
+ *
+ * @param string $name
+ *   Configuration name with variables in square brackets.
+ * @param mixed $data
+ *   Configuration data for the element.
+ * @return string
+ *   Configuration name with variables replaced.
+ */
+function _potx_config_replace_name($name, $config_data) {
+  if (preg_match_all("/\[(.*)\]/U", $name, $matches)) {
+    // Build our list of '[value]' => replacement.
+    $replace = array();
+    foreach (array_combine($matches[0], $matches[1]) as $key => $value) {
+      $replace[$key] = _potx_replace_variable($value, $config_data);
+    }
+
+    return strtr($name, $replace);
+  }
+  else {
+    return $name;
+  }
+}
+
+/**
+ * Replaces variable values in included names with configuration data.
+ *
+ * Variable values are nested configuration keys that will be replaced by
+ * their value or some of these special strings:
+ * - '%key', will be replaced by the element's key.
+ * - '%parent', to reference the parent element.
+ *
+ * There may be nested configuration keys separated by dots or more complex
+ * patterns like '%parent.name' which references the 'name' value of the
+ * parent element.
+ *
+ * Example patterns:
+ * - 'name.subkey', indicates a nested value of the current element.
+ * - '%parent.name', will be replaced by the 'name' value of the parent.
+ * - '%parent.%key', will be replaced by the parent element's key.
+ *
+ * Based on
+ *  Drupal\Core\Config\TypedConfigManager::replaceVariable($value, $data).
+ *
+ * @param string $value
+ *   Variable value to be replaced.
+ * @param mixed $data
+ *   Configuration data for the element.
+ *
+ * @return string
+ *   The replaced value if a replacement found or the original value if not.
+ */
+function _potx_replace_variable($value, $data) {
+  $parts = explode('.', $value);
+  // Process each value part, one at a time.
+  while ($name = array_shift($parts)) {
+    if (!is_array($data) || !isset($data[$name])) {
+      // Key not found, return original value
+      return $value;
+    }
+    elseif (!$parts) {
+      // If no more parts left, this is the final property.
+      return (string)$data[$name];
+    }
+    else {
+      $data = $data[$name];
+    }
+  }
+}
+
+/**
+ * Parse shipped configuration for translatables. Drupal 8+
+ *
+ * @param string $save_callback
+ * @param string $api_version
+ */
+function _potx_parse_shipped_configuration($save_callback = '_potx_save_string', $api_version = POTX_API_CURRENT) {
+  global $_potx_config_set;
+
+  if ($api_version > POTX_API_7) {
+    foreach ($_potx_config_set as $config_path) {
+      // Find the schema that matches the config file.
+      $path_info = pathinfo($config_path);
+      $config_name = $path_info['filename'];
+      $schema = _potx_find_matching_schema($config_name);
+
+      if ($schema == '') {
+        // No schema was found matching this config.
+        continue;
+      }
+
+      $config_code = file_get_contents($config_path);
+      $parsed_config = Yaml::parse($config_code);
+      unset($config_code);
+
+      _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_path, $save_callback);
+    }
+  }
+}
+
+/**
+ * Recursively check elements in shipped configuration with the processed schema.
+ *
+ * To support complex cases of variable replacement, '%key' and '%parent'
+ * indexes are defined for every element when available. 'key' and 'parent'
+ * values are also passed through the function parameters, because $config might
+ * be a scalar value, which would not accept an index. Parsing an element's
+ * properties inherited from its 'type' are processed separately from the
+ * properties defined through its 'mapping'.
+ *
+ * @param mixed $config
+ *   The config element being processed.
+ * @param string $schema_prefix
+ *   All parent keys (including the element's key) joined by '+' symbol.
+ * @param string $config_key
+ *   The config element's key.
+ * @param array $config_parent
+ *   The config element's parent.
+ */
+function _potx_find_shipped_config_translatables($config, $schema_prefix, $config_key, $config_parent, $config_path, $save_callback) {
+  global $_potx_processed_schema;
+
+  if (in_array($schema_prefix, $_potx_processed_schema['translatables'])) {
+    if (isset($_potx_processed_schema['contexts'][$schema_prefix])) {
+      $context = $_potx_processed_schema['contexts'][$schema_prefix];
+    }
+    else {
+      $context = POTX_CONTEXT_NONE;
+    }
+
+    $save_callback(addcslashes($config, "\0..\37\\\""), $context, $config_path);
+  }
+  else {
+    // Resolve the config element's type in schema to a real type, replacing all
+    // placeholders, and find the shipped config translatables based on that
+    // type.
+    if (isset($_potx_processed_schema['types'][$schema_prefix])) {
+      $schema_type = $_potx_processed_schema['types'][$schema_prefix];
+
+      if ($schema_type == 'sequence') {
+        foreach ($config as $sequence_key => $sequence_item) {
+          // '%key' and '%parent' keys are added to $config by potx. skip them.
+          if ($sequence_key === '%parent' || $sequence_key === '%key') continue;
+
+          if (is_array($sequence_item)) {
+            $sequence_item['%key'] = $sequence_key;
+            $sequence_type = _potx_config_replace_name($schema_prefix, $sequence_item);
+          }
+          else {
+            $sequence_type = _potx_config_replace_name($schema_prefix, array('%key' => $sequence_key));
+          }
+
+          _potx_find_shipped_config_translatables($sequence_item, $sequence_type . '+sequence', $sequence_key, NULL, $config_path, $save_callback);
+        }
+      }
+      else {
+        if (is_array($config)) {
+          $schema_type = _potx_config_replace_name($schema_type, $config);
+        }
+        else {
+          $schema_type = _potx_config_replace_name($schema_type, array('%key' => $config_key, '%parent' => $config_parent));
+        }
+
+        $matching_schema = _potx_find_matching_schema($schema_type);
+        _potx_find_shipped_config_translatables($config, $matching_schema, $config_key, $config_parent, $config_path, $save_callback);
+      }
+    }
+
+    // Check the keys belonging to config element's schema's "mapping" key.
+    if (in_array($schema_prefix, $_potx_processed_schema['mappings'])) {
+      foreach ($config as $key => $element) {
+        // '%key' and '%parent' keys are added to $config by potx. skip them.
+        if ($key === '%parent' || $key === '%key' || empty($element)) {
+          continue;
+        }
+
+        if (!_potx_element_has_schema($schema_prefix . '+' . $key)) {
+          continue;
+        }
+
+        if (is_array($element)) {
+          $element['%parent'] = $config;
+          $element['%key'] = $key;
+        }
+
+        _potx_find_shipped_config_translatables($element, $schema_prefix . '+' . $key, $key, $config, $config_path, $save_callback);
+      }
     }
   }
 }

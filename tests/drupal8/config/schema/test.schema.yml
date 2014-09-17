@@ -1,34 +1,41 @@
-# Test schema for configuration files.
-
 test.settings:
   type: mapping
-  label: 'Test settings'
   mapping:
-    label:
-      type: label
-      label: 'Label'
+    test_int:
+      type: integer
+      label: 'Test integer'
     test_string:
       type: string
       label: 'Test string with "quotes"'
-    test_bool:
-      type: boolean
-      label: 'Test boolean'
-    test_integer:
-      type: integer
-      label: 'Test integer'
-    test_sequence:
-      type: sequence
-      label: 'Test sequence'
-      sequence:
-        - type: sequence
-          label: 'Test sequence 2'
-          sequence:
-            - type: string
-              label: 'Test string 2'
+    test_date_format:
+      type: date_format
+    translatable_string:
+      type: translatable_string
+    untranslatable_text:
+      type: untranslatable_text
+    test_translatable_context:
+      type: translatable_with_context
+    test_label_context:
+      type: label_with_context
+    test_context_override:
+      type: label_context_override
     test_mapping:
-      type: mapping
-      label: 'Test mapping'
-      mapping:
-        type:
-          type: string
-          label: 'Test string 3'
+      type: simple_mapping
+    mapping_with_type:
+      type: mapping_with_type
+    test_sequence:
+      type: simple_sequence
+    typed_sequence:
+      type: typed_sequence
+    sequence_of_sequence:
+      type: sequence_of_sequence
+    test_variable:
+      type: basic_variable
+    parent_variable_test:
+      type: parent_variable.test
+    parent_variable_test2:
+      type: parent_variable.test2
+    key_variable:
+      type: key_variable
+    complex_variable:
+      type: complex_variable
