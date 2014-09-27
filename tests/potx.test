@@ -341,7 +341,7 @@ class PotxTestCase extends DrupalWebTestCase {
    * Test parsing of custom yaml files.
    */
   public function testDrupal8CustomYml() {
-    _potx_init_yaml_translation_patterns(drupal_get_path('module', 'potx') . '/tests/potx_test_8/');
+    potx_get_parser('Yaml')->loadTranslationPatterns(drupal_get_path('module', 'potx') . '/tests/potx_test_8/');
     $this->parseFile(drupal_get_path('module', 'potx') . '/tests/potx_test_8/potx_test_8.test.yml', POTX_API_8);
     $this->assertMsgID('Test custom yaml translatable');
     $this->assertMsgIDContext('Test custom yaml translatable with context', 'Yaml translatable context');
