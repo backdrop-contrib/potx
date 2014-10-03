@@ -108,7 +108,7 @@ function potx_drush_extract($mode = NULL) {
     _potx_process_file($file, 0, '_potx_save_string', '_potx_save_version', $api_option);
   }
 
-  _potx_parse_shipped_configuration('_potx_save_string', $api_option);
+  potx_finish_processing('_potx_save_string', $api_option);
 
   _potx_build_files(POTX_STRING_RUNTIME, $build_mode);
   _potx_build_files(POTX_STRING_INSTALLER, POTX_BUILD_SINGLE, 'installer');

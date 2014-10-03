@@ -122,6 +122,8 @@ function potx_select_component_form_submit($form, &$form_state) {
   foreach ($files as $file) {
     _potx_process_file($file, $strip_prefix);
   }
+  potx_finish_processing('_potx_save_string');
+
   // Need to include full parameter list to get to passing the language codes.
   _potx_build_files(POTX_STRING_RUNTIME, POTX_BUILD_SINGLE, 'general', '_potx_save_string', '_potx_save_version', '_potx_get_header', $template_langcode, $translation_langcode);
 

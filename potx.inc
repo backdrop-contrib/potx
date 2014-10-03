@@ -364,6 +364,19 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 }
 
 /**
+ * Executes tasks that need to happen after all the files have been processed.
+ *
+ * @param string $save_callback
+ * @param int $api_version
+ */
+function potx_finish_processing($save_callback = '_potx_save_string', $api_version = POTX_API_CURRENT) {
+  if ($api_version > POTX_API_7) {
+    // Parsing shipped configuration has to happen after processing all schemas.
+    _potx_parse_shipped_configuration($save_callback, $api_version);
+  }
+}
+
+/**
  * Creates complete file strings with _potx_store()
  *
  * @param $string_mode
@@ -2318,25 +2331,22 @@ function _potx_replace_variable($value, $data) {
  */
 function _potx_parse_shipped_configuration($save_callback = '_potx_save_string', $api_version = POTX_API_CURRENT) {
   global $_potx_config_set;
+  foreach ($_potx_config_set as $config_path) {
+    // Find the schema that matches the config file.
+    $path_info = pathinfo($config_path);
+    $config_name = $path_info['filename'];
+    $schema = _potx_find_matching_schema($config_name);
 
-  if ($api_version > POTX_API_7) {
-    foreach ($_potx_config_set as $config_path) {
-      // Find the schema that matches the config file.
-      $path_info = pathinfo($config_path);
-      $config_name = $path_info['filename'];
-      $schema = _potx_find_matching_schema($config_name);
-
-      if ($schema == '') {
-        // No schema was found matching this config.
-        continue;
-      }
-
-      $config_code = file_get_contents($config_path);
-      $parsed_config = Yaml::parse($config_code);
-      unset($config_code);
-
-      _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_path, $save_callback);
+    if ($schema == '') {
+      // No schema was found matching this config.
+      continue;
     }
+
+    $config_code = file_get_contents($config_path);
+    $parsed_config = Yaml::parse($config_code);
+    unset($config_code);
+
+    _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_path, $save_callback);
   }
 }
 
