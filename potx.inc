@@ -285,8 +285,10 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 
   if ($api_version > POTX_API_5) {
     // Watchdog calls have both of their arguments translated from Drupal 6.x.
-    // @todo Drupal 8 deprecated watchdog() but did not remove it yet.
-    _potx_find_watchdog_calls($file_name, $save_callback);
+    if ($api_version < POTX_API_8) {
+      _potx_find_watchdog_calls($file_name, $save_callback);
+    }
+
     if ($api_version > POTX_API_7) {
       // Logging calls may use a colorful set of methods now.
       _potx_find_t_calls($file_name, $save_callback, 'debug');
@@ -943,7 +945,7 @@ function _potx_find_t_calls_with_context($file, $save_callback, $function_name =
 }
 
 /**
- * Detect all occurances of watchdog() calls. Only from Drupal 6.
+ * Detect all occurances of watchdog() calls. Only in Drupal 6 and Drupal 7.
  *
  * These sequences are searched for:
  *   watchdog + "(" + T_CONSTANT_ENCAPSED_STRING + "," +
