@@ -235,10 +235,16 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
          $constraint_match = $constraint_extract && $token[0] == T_VARIABLE && strlen($token[1]) >= 7 && substr_compare($token[1], 'message', -7, 7, true) === 0;
 
          // Fill array for finding token offsets quickly.
-         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t') || $constraint_match) {
+         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t') || $constraint_match
+             || ($token[0] == T_CONSTANT_ENCAPSED_STRING && ($token[1] == "'#template'" || $token[1] == '"#template"'))) {
 
            // Give doc comments a specific key because their content varies.
            $key = ($token[0] == T_DOC_COMMENT) ? 'T_DOC_COMMENT' : ($constraint_match ? 'T_POTX_CONSTRAINT' : $token[1]);
+           // Normalise "#template" token to support both single-quoted and double-quoted #template keys.
+           if ($key == '"#template"') {
+             $key = "'#template'";
+           }
+
            if (!isset($_potx_lookup[$key])) {
              $_potx_lookup[$key] = array();
            }
@@ -333,6 +339,10 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
 
   if ($constraint_extract) {
     _potx_find_constraint_messages($file_name, $save_callback);
+  }
+
+  if ($api_version > POTX_API_7) {
+    _potx_process_inline_templates($file_name, $save_callback);
   }
 
   // Special handling of some Drupal core files.
@@ -2486,6 +2496,40 @@ function _potx_find_constraint_messages($file_name, $save_callback) {
       else {
         $save_callback(_potx_format_quoted_string($str), POTX_CONTEXT_NONE, $file_name, $_potx_tokens[$ti][2]);
       }
+    }
+  }
+}
+
+/**
+ * Process Twig inline templates inside PHP files. Drupal 8+
+ *
+ * The patterns searched for inline templates include:
+ *   1. '#template' => T_CONSTANT_ENCAPSED_STRING
+ *   2. ['#template'] = T_CONSTANT_ENCAPSED_STRING
+ *
+ * @param $file_name
+ *   Name of file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ */
+function _potx_process_inline_templates($file_name, $save_callback) {
+  global $_potx_tokens, $_potx_lookup;
+
+  if (!isset($_potx_lookup["'#template'"])) {
+    return;
+  }
+
+  foreach ($_potx_lookup["'#template'"] as $key => $ti) {
+    // check for pattern: '#template' => T_CONSTANT_ENCAPSED_STRING
+    if ($_potx_tokens[$ti + 1][0] == T_DOUBLE_ARROW && $_potx_tokens[$ti + 2][0] == T_CONSTANT_ENCAPSED_STRING) {
+      $str = $_potx_tokens[$ti + 2][1];
+      _potx_parse_twig_file($str, $file_name . '::inline-template', $save_callback);
+    }
+    // check for pattern: ['#template'] = T_CONSTANT_ENCAPSED_STRING
+    elseif ($_potx_tokens[$ti - 1] == '[' && $_potx_tokens[$ti + 1] == ']'
+            && $_potx_tokens[$ti + 2] == '=' && $_potx_tokens[$ti + 3][0] == T_CONSTANT_ENCAPSED_STRING) {
+      $str = $_potx_tokens[$ti + 3][1];
+      _potx_parse_twig_file($str, $file_name . '::inline-template', $save_callback);
     }
   }
 }

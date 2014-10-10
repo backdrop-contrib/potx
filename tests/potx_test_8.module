@@ -76,3 +76,16 @@ class PotxTestD8 {
     \Drupal::translation()->formatPlural($count, '1 translation->formatPlural test string', '@count translation->formatPlural test strings');
   }
 }
+
+/**
+ * Test parsing inline templates inside PHP files in Drupal 8.
+ */
+function potx_test_inline_templates() {
+  $render_array = array(
+    '#type' => 'inline_template',
+    '#template' => "Here is a {% trans 'Test translatable string inside an inline template' %}."
+  );
+
+  $render_array['#template'] = 'Here is {% trans %}Another test translatable string inside an inline template{% endtrans %}';
+  $render_array["#template"] = 'Here is {% trans %}A translatable string inside an inline template, with double-quoted "#template" key{% endtrans %}';
+}
