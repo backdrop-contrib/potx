@@ -65,7 +65,7 @@ function potx_drush_help($section) {
  */
 function potx_drush_extract($mode = NULL) {
   // Include library.
-  include_once drupal_get_path('module', 'potx') . '/potx.inc';
+  include_once __DIR__ . '/potx.inc';
 
   $files = array();
   $build_mode = POTX_BUILD_SINGLE;
