@@ -1922,7 +1922,10 @@ function _potx_find_translation_annotations($file, $save_callback) {
  */
 function _potx_init_yaml_translation_patterns($path = '') {
   global $yaml_translation_patterns;
-  $yaml_translation_patterns = array();
+
+  if (!is_array($yaml_translation_patterns)) {
+    $yaml_translation_patterns = array();
+  }
 
   $default_patterns = drupal_get_path('module', 'potx') . '/yaml_translation_patterns.yml';
   _potx_load_yaml_translation_patterns($default_patterns);
