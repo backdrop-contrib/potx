@@ -36,7 +36,7 @@ use Symfony\Component\Yaml\Yaml;
  *
  * This should be the only difference between different branches of potx.inc
  */
-define('POTX_API_CURRENT', 7);
+define('POTX_API_CURRENT', 6);
 
 /**
  * Silence status reports.
