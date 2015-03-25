@@ -1999,7 +1999,7 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
       _potx_process_config_schema($key, $element);
     }
   }
-  elseif (preg_match('~config/install/[^/]+\.yml$~', $file_name)) {
+  elseif (preg_match('~config/(install|optional)/[^/]+\.yml$~', $file_name)) {
     $_potx_config_set[] = $file_path;
   }
 }

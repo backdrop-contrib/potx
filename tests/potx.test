@@ -431,6 +431,9 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Key variable (text)');
     $this->assertMsgID('Complex variable test');
 
+    $this->assertMsgID('Optional config translatable string');
+    $this->assertMsgIDContext('Optional config test string with context', 'Test context');
+
     $this->assertNoMsgID('A simple string');
     $this->assertNoMsgID('A text with "translatable: false" property');
     $this->assertNoMsgID('text');
