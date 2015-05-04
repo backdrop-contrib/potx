@@ -382,9 +382,13 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
  * @param int $api_version
  */
 function potx_finish_processing($save_callback = '_potx_save_string', $api_version = POTX_API_CURRENT) {
+  global $yaml_translation_patterns;
   if ($api_version > POTX_API_7) {
     // Parsing shipped configuration has to happen after processing all schemas.
     _potx_parse_shipped_configuration($save_callback, $api_version);
+    // Clear yaml translation patterns, so translation patterns for a module
+    // won't be used for extracting translatable strings for another module.
+    $yaml_translation_patterns = NULL;
   }
 }
 
@@ -1925,10 +1929,9 @@ function _potx_init_yaml_translation_patterns($path = '') {
 
   if (!is_array($yaml_translation_patterns)) {
     $yaml_translation_patterns = array();
+    $default_patterns = __DIR__ . '/yaml_translation_patterns.yml';
+    _potx_load_yaml_translation_patterns($default_patterns);
   }
-
-  $default_patterns = drupal_get_path('module', 'potx') . '/yaml_translation_patterns.yml';
-  _potx_load_yaml_translation_patterns($default_patterns);
 
   $custom_patterns = $path . '/yaml_translation_patterns.yml';
   if (!empty($path) && file_exists($custom_patterns)) {
@@ -1982,7 +1985,7 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
   global $yaml_translation_patterns;
   global $_potx_config_set;
 
-  if (!isset($yaml_translation_patterns)) {
+  if (!is_array($yaml_translation_patterns)) {
     _potx_init_yaml_translation_patterns();
   }
 
@@ -2346,6 +2349,10 @@ function _potx_replace_variable($value, $data) {
  */
 function _potx_parse_shipped_configuration($save_callback = '_potx_save_string', $api_version = POTX_API_CURRENT) {
   global $_potx_config_set;
+  if (!is_array($_potx_config_set)) {
+    return;
+  }
+
   foreach ($_potx_config_set as $config_path) {
     // Find the schema that matches the config file.
     $path_info = pathinfo($config_path);

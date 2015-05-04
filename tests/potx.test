@@ -345,10 +345,23 @@ class PotxTestCase extends DrupalWebTestCase {
    * Test parsing of custom yaml files.
    */
   public function testDrupal8CustomYml() {
-    _potx_init_yaml_translation_patterns(drupal_get_path('module', 'potx') . '/tests/potx_test_8/');
-    $this->parseFile(drupal_get_path('module', 'potx') . '/tests/potx_test_8/potx_test_8.test.yml', POTX_API_8);
+    $files = _potx_explore_dir(drupal_get_path('module', 'potx') . '/tests/potx_test_8/', '*', POTX_API_8);
+    _potx_init_yaml_translation_patterns();
+    $this->parseFile($files[0], POTX_API_8);
     $this->assertMsgID('Test custom yaml translatable');
     $this->assertMsgIDContext('Test custom yaml translatable with context', 'Yaml translatable context');
+
+    // Test that translation patterns for a module won't be used for extracting
+    // translatable strings for another module.
+    potx_finish_processing('_potx_save_string', POTX_API_8);
+    $files = _potx_explore_dir(drupal_get_path('module', 'potx') . '/tests/potx_test_yml/', '*', POTX_API_8);
+    $this->parseFile(drupal_get_path('module', 'potx') . '/tests/potx_test_yml/potx_test_8.test2.yml', POTX_API_8);
+    $this->assertNoMsgID('Not translatable string');
+    $this->assertMsgID('Translatable string');
+    $this->assertMsgIDContext('Test custom yaml translatable field with context', 'Yaml translatable context');
+    // Test that custom translation patterns are extracted from subfolders.
+    $this->parseFile(drupal_get_path('module', 'potx') . '/tests/potx_test_yml/test_folder/potx_test_8.test3.yml', POTX_API_8);
+    $this->assertMsgID('Translatable string inside directory');
   }
 
   /**
