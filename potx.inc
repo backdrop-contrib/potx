@@ -30,6 +30,7 @@ spl_autoload_register(function($c){
 });
 
 use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\Yaml\Exception\ParseException;
 
 /**
  * The current Drupal major API verion.
@@ -1991,8 +1992,15 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
 
   foreach ($yaml_translation_patterns as $pattern => $trans_list) {
     if (fnmatch($pattern, $file_name) || fnmatch('*/' . $pattern, $file_name)) {
-      $yaml = Yaml::parse($code);
-      _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback);
+      try {
+        $yaml = Yaml::parse($code);
+        _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback);
+      } catch (ParseException $e) {
+        watchdog('potx', "YAML parseing error on file @path: @error", array(
+          '@path' => $file_path,
+          '@error' => $e->getMessage(),
+        ));
+      }
     }
   }
 
