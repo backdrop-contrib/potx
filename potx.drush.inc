@@ -89,7 +89,7 @@ function potx_drush_extract($mode = NULL) {
   if (!empty($modules_option)) {
     $modules = explode(',', $modules_option);
     foreach ($modules as $module) {
-      $files = array_merge($files, _potx_explore_dir(drupal_get_path('module', $module), '*', $api_option, TRUE));
+      $files = array_merge($files, _potx_explore_dir(drupal_get_path('module', $module) . '/', '*', $api_option, TRUE));
     }
   }
   elseif (!empty($files_option)) {
@@ -100,7 +100,7 @@ function potx_drush_extract($mode = NULL) {
   }
   else {
     // No file list provided so autodiscover files in current directory.
-    $files = _potx_explore_dir(drush_cwd(), '*', $api_option, TRUE);
+    $files = _potx_explore_dir(drush_cwd() . '/', '*', $api_option, TRUE);
   }
 
   foreach ($files as $file) {
