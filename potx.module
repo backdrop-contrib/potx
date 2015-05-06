@@ -61,7 +61,7 @@ function potx_reviews() {
 function potx_coder_review(&$coder_args, $review, $rule, $lines, &$results) {
 
   // Include potx API.
-  include_once drupal_get_path('module', 'potx') .'/potx.inc';
+  include_once __DIR__ . '/potx.inc';
 
   // Request collection of error messages internally in a structured format.
   potx_status('set', POTX_STATUS_STRUCTURED);
