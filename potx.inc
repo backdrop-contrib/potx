@@ -1707,7 +1707,7 @@ function _potx_parse_js_string($string) {
  * Parse a Twig template for translatables. Drupal 8+.
  */
 function _potx_parse_twig_file($code, $file, $save_callback) {
-  $twig_lexer = new Twig_Lexer();
+  $twig_lexer = new Twig_Lexer(new Twig_Environment());
   $stream = $twig_lexer->tokenize($code, $file);
 
   while (!$stream->isEOF()) {

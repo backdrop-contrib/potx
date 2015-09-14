@@ -25,6 +25,7 @@ class Twig_Lexer implements Twig_LexerInterface
     protected $state;
     protected $states;
     protected $brackets;
+    protected $env;
     protected $filename;
     protected $options;
     protected $regexes;
@@ -45,8 +46,10 @@ class Twig_Lexer implements Twig_LexerInterface
     const REGEX_DQ_STRING_PART  = '/[^#"\\\\]*(?:(?:\\\\.|#(?!\{))[^#"\\\\]*)*/As';
     const PUNCTUATION           = '()[]{}?:.,|';
 
-    public function __construct(array $options = array())
+    public function __construct(Twig_Environment $env, array $options = array())
     {
+        $this->env = $env;
+
         $this->options = array_merge(array(
             'tag_comment'     => array('{#', '#}'),
             'tag_block'       => array('{%', '%}'),
@@ -77,6 +80,8 @@ class Twig_Lexer implements Twig_LexerInterface
         if (function_exists('mb_internal_encoding') && ((int) ini_get('mbstring.func_overload')) & 2) {
             $mbEncoding = mb_internal_encoding();
             mb_internal_encoding('ASCII');
+        } else {
+            $mbEncoding = null;
         }
 
         $this->code = str_replace(array("\r\n", "\r"), "\n", $code);
@@ -127,7 +132,7 @@ class Twig_Lexer implements Twig_LexerInterface
             throw new Twig_Error_Syntax(sprintf('Unclosed "%s"', $expect), $lineno, $this->filename);
         }
 
-        if (isset($mbEncoding)) {
+        if ($mbEncoding) {
             mb_internal_encoding($mbEncoding);
         }
 
@@ -361,11 +366,8 @@ class Twig_Lexer implements Twig_LexerInterface
     {
         $operators = array_merge(
             array('='),
-            array('not', '-', '+'),
-            array('or', 'and', 'b-or', 'b-xor', 'b-and', '==', '!=', '<', '>',
-                '>=', '<=', 'not in', 'in', 'matches', 'starts with',
-                'ends with', '..', '+', '-', '~', '*', '/', '//', '%', 'is',
-                'is not', '**')
+            array_keys($this->env->getUnaryOperators()),
+            array_keys($this->env->getBinaryOperators())
         );
 
         $operators = array_combine($operators, array_map('strlen', $operators));
