@@ -1947,14 +1947,20 @@ function _potx_init_yaml_translation_patterns($path = '') {
  * The file is expected to be in the following format:
  * @code
  *   # A list of file matching patterns (as expected by fnmatch()).
- *   *.test_format.yml:
+ *   - matches: *.test_format.yml:
  *     # A sequence of translatable keys in the matched YAML files.
- *     - test_label
- *     - test_label_2:
+ *     translatable_keys:
+ *
+ *       # Using the shorthand form
+ *       - test_label
+ *
+ *       # Using the long form
+ *       - key: test_label_2
  *         # An optional key, used as context for the translatable string.
  *         context: label_2_context
- *     # To mark all top-level keys as translatable, use the '%top-level-key' string.
- *     - %top-level-key
+ *     # To mark all top-level keys as translatable,
+ *     #   use the 'top_level_translatables' setting (optional; default: FALSE).
+ *     top_level_translatables: TRUE
  * @endcode
  *
  * @param string $path
@@ -1965,17 +1971,26 @@ function _potx_load_yaml_translation_patterns($path) {
 
   $content = Yaml::parse(file_get_contents($path));
 
-  foreach ($content as $pattern => $list) {
-    foreach ($list as $value) {
-      if (is_array($value)) {
-        foreach ($value as $key => $context) {
-          $yaml_translation_patterns[$pattern]['keys'][] = $key;
-          $yaml_translation_patterns[$pattern]['contexts'][$key] = $context['context'];
+  if (isset($content['translation_patterns'])) {
+    $patterns = $content['translation_patterns'];
+    foreach ($patterns as $pattern) {
+      if (!isset($pattern['matches']) || !isset($pattern['translatable_keys'])) {
+        continue;
+      }
+
+      $match = $pattern['matches'];
+      $list = $pattern['translatable_keys'];
+      foreach ($list as $item) {
+        if (is_array($item)) {
+          $yaml_translation_patterns[$match]['keys'][] = $item['key'];
+          $yaml_translation_patterns[$match]['contexts'][$item['key']] = $item['context'];
+        }
+        else {
+          $yaml_translation_patterns[$match]['keys'][] = $item;
         }
       }
-      else {
-        $yaml_translation_patterns[$pattern]['keys'][] = $value;
-      }
+
+      $yaml_translation_patterns[$match]['top_level_translatables'] = isset($pattern['top_level_translatables']) ? $pattern['top_level_translatables'] : FALSE;
     }
   }
 }
@@ -2025,11 +2040,7 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
  *   The list of translatable keys to look for, and (optionally) their contexts.
  */
 function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback) {
-  $extract_values = FALSE;
-  if (in_array('%top-level-key', $trans_list['keys'], TRUE)) {
-    $extract_values = TRUE;
-    $trans_list['keys'] = array_diff($trans_list['keys'], array('%top-level-key'));
-  }
+  $extract_values = $trans_list['top_level_translatables'];
 
   foreach ($yaml as $key => $value) {
 
