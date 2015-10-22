@@ -322,6 +322,7 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   // Support for formatPlural() calls in Drupal 8+.
   if ($api_version > POTX_API_7) {
     _potx_find_format_plural_calls($file_name, $save_callback, 'formatPlural', $api_version);
+    _potx_find_format_plural_calls($file_name, $save_callback, 'PluralTranslatableMarkup', $api_version);
   }
 
   if ($name_parts['extension'] == 'module') {

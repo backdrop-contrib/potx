@@ -77,6 +77,9 @@ class PotxTestD8 {
 
     \Drupal::translation()->formatPlural($count, '1 translation->formatPlural test string in context', '@count translation->formatPlural test strings in context', array(), array('context' => 'Test context'));
     \Drupal::translation()->formatPlural($count, '1 translation->formatPlural test string', '@count translation->formatPlural test strings');
+
+    $a = new PluralTranslatableMarkup($count, '1 PluralTranslatableMarkup test string', '@count PluralTranslatableMarkup test strings');
+    $b = new PluralTranslatableMarkup($count, '1 PluralTranslatableMarkup test string with context', '@count PluralTranslatableMarkup test strings with context', array(), array('context' => 'Test context'));
   }
 }
 
