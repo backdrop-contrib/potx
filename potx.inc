@@ -317,7 +317,10 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   }
 
   // Plurals need unique parsing.
-  _potx_find_format_plural_calls($file_name, $save_callback, 'format_plural', $api_version);
+  if ($api_version < POTX_API_8) {
+    // format_plural() is removed in Drupal 8.
+    _potx_find_format_plural_calls($file_name, $save_callback, 'format_plural', $api_version);
+  }
 
   // Support for formatPlural() calls in Drupal 8+.
   if ($api_version > POTX_API_7) {
