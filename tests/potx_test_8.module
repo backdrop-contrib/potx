@@ -16,8 +16,8 @@ function potx_test_8_example() {
   $a = new TranslationWrapper('TranslationWrapper string');
   $b = new TranslationWrapper('TranslationWrapper string with context', array(), array('context' => 'With context'));
 
-  $a = new TranslatableString('TranslatableString string');
-  $b = new TranslatableString('TranslatableString string with context', array(), array('context' => 'With context'));
+  $a = new TranslatableMarkup('TranslatableMarkup string');
+  $b = new TranslatableMarkup('TranslatableMarkup string with context', array(), array('context' => 'With context'));
 
   $a->debug('Debug message');
   $b->info('Info message');

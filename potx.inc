@@ -275,8 +275,8 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
       _potx_find_t_calls_with_context($file_name, $save_callback, 'st', POTX_STRING_INSTALLER);
     }
     else {
-      // TranslatableString (and deprecated TranslationWrapper) added in Drupal 8.
-      _potx_find_t_calls_with_context($file_name, $save_callback, 'TranslatableString');
+      // TranslatableMarkup (and deprecated TranslationWrapper) added in Drupal 8.
+      _potx_find_t_calls_with_context($file_name, $save_callback, 'TranslatableMarkup');
       _potx_find_t_calls_with_context($file_name, $save_callback, 'TranslationWrapper');
     }
   }
