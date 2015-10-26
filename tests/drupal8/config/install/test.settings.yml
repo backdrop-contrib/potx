@@ -35,6 +35,9 @@ sequence_of_sequence:
   sq2:
     - id: 7
       description: 'Sequence of sequence - Description 2'
+bc_sequence:
+  - 'BC sequence item 1'
+  - 'BC sequence item 2'
 
 # tests for variables.schema.yml
 test_variable:

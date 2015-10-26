@@ -445,6 +445,8 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Typed sequence - Item 2 code');
     $this->assertMsgID('Sequence of sequence - Description 1');
     $this->assertMsgID('Sequence of sequence - Description 2');
+    $this->assertMsgID('BC sequence item 1');
+    $this->assertMsgID('BC sequence item 2');
     $this->assertMsgID('Basic variable (text)');
     $this->assertMsgID('Parent variable (text)');
     $this->assertMsgID('Key variable (text)');

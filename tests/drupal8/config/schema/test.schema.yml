@@ -29,6 +29,8 @@ test.settings:
       type: typed_sequence
     sequence_of_sequence:
       type: sequence_of_sequence
+    bc_sequence:
+      type: bc_sequence
     test_variable:
       type: basic_variable
     parent_variable_test:
