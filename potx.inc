@@ -2014,7 +2014,7 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
     if (fnmatch($pattern, $file_name) || fnmatch('*/' . $pattern, $file_name)) {
       try {
         $yaml = Yaml::parse($code);
-        _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback);
+        _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback, TRUE);
       } catch (ParseException $e) {
         watchdog('potx', "YAML parseing error on file @path: @error", array(
           '@path' => $file_path,
@@ -2042,9 +2042,15 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
  *   The parsed YAML data.
  * @param array $trans_list
  *   The list of translatable keys to look for, and (optionally) their contexts.
+ * @param $file_name
+ *   Name of the file parsed.
+ * @param $save_callback
+ *   Callback function used to save strings.
+ * @param $top_level
+ *   Indicates that the top-level keys are being scanned.
  */
-function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback) {
-  $extract_values = $trans_list['top_level_translatables'];
+function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback, $top_level) {
+  $extract_values = $top_level && $trans_list['top_level_translatables'];
 
   foreach ($yaml as $key => $value) {
 
@@ -2072,7 +2078,7 @@ function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_cal
       }
     }
     elseif (is_array($value)) {
-      _potx_find_yaml_translatables($value, $trans_list, $file_name, $save_callback);
+      _potx_find_yaml_translatables($value, $trans_list, $file_name, $save_callback, FALSE);
     }
     elseif ($extract_values) {
       $save_callback(addcslashes($value, "\0..\37\\\""), POTX_CONTEXT_NONE, $file_name);

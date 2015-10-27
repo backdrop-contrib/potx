@@ -389,6 +389,7 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgID('Title potx_test_8_a');
     $this->assertMsgID('Description: potx_test_8_a');
     $this->assertMsgID('Title potx_test_8_b');
+    $this->assertNoMsgID('some_callback');
   }
 
   /**
