@@ -104,3 +104,8 @@ function potx_test_inline_templates() {
   $render_array['#template'] = 'Here is {% trans %}Another test translatable string inside an inline template{% endtrans %}';
   $render_array["#template"] = 'Here is {% trans %}A translatable string inside an inline template, with double-quoted "#template" key{% endtrans %}';
 }
+
+/**
+ * Test that potx ignores translation keywords in non-translation situations, without causing notices.
+ */
+class TestWrapper extends TranslatableMarkup {}

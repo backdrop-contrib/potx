@@ -933,6 +933,10 @@ function _potx_find_t_calls_with_context($file, $save_callback, $function_name =
   // Lookup tokens by function name.
   if (isset($_potx_lookup[$function_name])) {
     foreach ($_potx_lookup[$function_name] as $ti) {
+      if (count($_potx_tokens) <= $ti + 3 || $_potx_tokens[$ti+1] != '(') {
+        // This is not a t() call or similar, e.g. "TranslatableMarkup" in "class TranslationWrapper extends TranslatableMarkup {}"
+        continue;
+      }
       list($prev, $ctok, $par, $mid, $rig) = array($_potx_tokens[$ti - 1], $_potx_tokens[$ti], $_potx_tokens[$ti+1], $_potx_tokens[$ti+2], $_potx_tokens[$ti+3]);
       list($type, $string, $line) = $ctok;
 
