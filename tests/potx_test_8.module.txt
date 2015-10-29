@@ -2,7 +2,9 @@
 
 /**
  * @file
- *   File used purely to test the parser in potx.
+ *   File used purely to test the parser in potx. This is file has a .txt
+ *   extension so that it does not fail linting tests run by continuous
+ *   integration.
  */
 
 /**
@@ -13,11 +15,18 @@
  * )
  */
 function potx_test_8_example() {
+  // Tested with long format array style.
   $a = new TranslationWrapper('TranslationWrapper string');
   $b = new TranslationWrapper('TranslationWrapper string with context', array(), array('context' => 'With context'));
 
+  // Test with short format array styles mixed with other tokens.
   $a = new TranslatableMarkup('TranslatableMarkup string');
-  $b = new TranslatableMarkup('TranslatableMarkup string with context', array(), array('context' => 'With context'));
+  $c = new TranslatableMarkup('TranslatableMarkup string without context', []);
+  $d = new TranslatableMarkup('TranslatableMarkup string with long array context', [], array('context' => 'With context']));
+  $d = new TranslatableMarkup('TranslatableMarkup string with short array context', [], ['context' => 'With context']);
+  $e = new TranslatableMarkup('TranslatableMarkup string with long array followed by short array context', array(), ['context' => 'With context']);
+  $f = new TranslatableMarkup('TranslatableMarkup string with complicated tokens', array([], 2, potx_test_8_sample(), array(), [[]]), ['context' => 'With context']);
+  $g = new TranslatableMarkup('TranslatableMarkup string with complicated option tokens', [], ['foo' => potx_test_8_sample([4]), 'bar' => [12, 14, []], 'context' => 'With context', 'eek' => 'ook']);
 
   $a->debug('Debug message');
   $b->info('Info message');

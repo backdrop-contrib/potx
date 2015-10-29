@@ -233,7 +233,7 @@ class PotxTestCase extends DrupalWebTestCase {
    */
   public function testDrupal8() {
     // Parse and build the Drupal 8 module file.
-    $filename = __DIR__ . '/potx_test_8.module';
+    $filename = __DIR__ . '/potx_test_8.module.txt';
     $this->parseFile($filename, POTX_API_8);
 
     // Test parsing $this->t calls in D8 code
@@ -266,7 +266,12 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertMsgIDContext('TranslationWrapper string with context', 'With context');
 
     $this->assertMsgID('TranslatableMarkup string');
-    $this->assertMsgIDContext('TranslatableMarkup string with context', 'With context');
+    $this->assertMsgID('TranslatableMarkup string without context');
+    $this->assertMsgIDContext('TranslatableMarkup string with long array context', 'With context');
+    $this->assertMsgIDContext('TranslatableMarkup string with short array context', 'With context');
+    $this->assertMsgIDContext('TranslatableMarkup string with long array followed by short array context', 'With context');
+    $this->assertMsgIDContext('TranslatableMarkup string with complicated tokens', 'With context');
+    $this->assertMsgIDContext('TranslatableMarkup string with complicated option tokens', 'With context');
 
     $this->assertMsgID('Test translatable string inside an inline template');
     $this->assertMsgID('Another test translatable string inside an inline template');
