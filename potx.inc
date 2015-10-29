@@ -2031,7 +2031,7 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
     }
   }
   elseif (preg_match('~config/(install|optional)/[^/]+\.yml$~', $file_name)) {
-    $_potx_config_set[] = $file_path;
+    $_potx_config_set[] = array($file_name, $file_path);
   }
 }
 
@@ -2384,9 +2384,9 @@ function _potx_parse_shipped_configuration($save_callback = '_potx_save_string',
     return;
   }
 
-  foreach ($_potx_config_set as $config_path) {
+  foreach ($_potx_config_set as $config_paths) {
     // Find the schema that matches the config file.
-    $path_info = pathinfo($config_path);
+    $path_info = pathinfo($config_paths[1]);
     $config_name = $path_info['filename'];
     $schema = _potx_find_matching_schema($config_name);
 
@@ -2395,11 +2395,11 @@ function _potx_parse_shipped_configuration($save_callback = '_potx_save_string',
       continue;
     }
 
-    $config_code = file_get_contents($config_path);
+    $config_code = file_get_contents($config_paths[1]);
     $parsed_config = Yaml::parse($config_code);
     unset($config_code);
 
-    _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_path, $save_callback);
+    _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_paths[0], $save_callback);
   }
 }
 
@@ -2421,8 +2421,12 @@ function _potx_parse_shipped_configuration($save_callback = '_potx_save_string',
  *   The config element's key.
  * @param array $config_parent
  *   The config element's parent.
+ * @param string $file_name
+ *   Name of file parsed.
+ * @param callable $save_callback
+ *   Callback function used to save strings.
  */
-function _potx_find_shipped_config_translatables($config, $schema_prefix, $config_key, $config_parent, $config_path, $save_callback) {
+function _potx_find_shipped_config_translatables($config, $schema_prefix, $config_key, $config_parent, $file_name, $save_callback) {
   global $_potx_processed_schema;
 
   if (in_array($schema_prefix, $_potx_processed_schema['translatables'])) {
@@ -2433,7 +2437,7 @@ function _potx_find_shipped_config_translatables($config, $schema_prefix, $confi
       $context = POTX_CONTEXT_NONE;
     }
 
-    $save_callback(addcslashes($config, "\0..\37\\\""), $context, $config_path);
+    $save_callback(addcslashes($config, "\0..\37\\\""), $context, $file_name);
   }
   else {
     // Resolve the config element's type in schema to a real type, replacing all
@@ -2455,7 +2459,7 @@ function _potx_find_shipped_config_translatables($config, $schema_prefix, $confi
             $sequence_type = _potx_config_replace_name($schema_prefix, array('%key' => $sequence_key));
           }
 
-          _potx_find_shipped_config_translatables($sequence_item, $sequence_type . '+sequence', $sequence_key, NULL, $config_path, $save_callback);
+          _potx_find_shipped_config_translatables($sequence_item, $sequence_type . '+sequence', $sequence_key, NULL, $file_name, $save_callback);
         }
       }
       else {
@@ -2467,7 +2471,7 @@ function _potx_find_shipped_config_translatables($config, $schema_prefix, $confi
         }
 
         $matching_schema = _potx_find_matching_schema($schema_type);
-        _potx_find_shipped_config_translatables($config, $matching_schema, $config_key, $config_parent, $config_path, $save_callback);
+        _potx_find_shipped_config_translatables($config, $matching_schema, $config_key, $config_parent, $file_name, $save_callback);
       }
     }
 
@@ -2488,7 +2492,7 @@ function _potx_find_shipped_config_translatables($config, $schema_prefix, $confi
           $element['%key'] = $key;
         }
 
-        _potx_find_shipped_config_translatables($element, $schema_prefix . '+' . $key, $key, $config, $config_path, $save_callback);
+        _potx_find_shipped_config_translatables($element, $schema_prefix . '+' . $key, $key, $config, $file_name, $save_callback);
       }
     }
   }
@@ -2564,13 +2568,13 @@ function _potx_process_inline_templates($file_name, $save_callback) {
     // check for pattern: '#template' => T_CONSTANT_ENCAPSED_STRING
     if ($_potx_tokens[$ti + 1][0] == T_DOUBLE_ARROW && $_potx_tokens[$ti + 2][0] == T_CONSTANT_ENCAPSED_STRING) {
       $str = $_potx_tokens[$ti + 2][1];
-      _potx_parse_twig_file($str, $file_name . '::inline-template', $save_callback);
+      _potx_parse_twig_file($str, $file_name, $save_callback);
     }
     // check for pattern: ['#template'] = T_CONSTANT_ENCAPSED_STRING
     elseif ($_potx_tokens[$ti - 1] == '[' && $_potx_tokens[$ti + 1] == ']'
             && $_potx_tokens[$ti + 2] == '=' && $_potx_tokens[$ti + 3][0] == T_CONSTANT_ENCAPSED_STRING) {
       $str = $_potx_tokens[$ti + 3][1];
-      _potx_parse_twig_file($str, $file_name . '::inline-template', $save_callback);
+      _potx_parse_twig_file($str, $file_name, $save_callback);
     }
   }
 }
