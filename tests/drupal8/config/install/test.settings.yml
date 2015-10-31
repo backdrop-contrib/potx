@@ -58,3 +58,7 @@ complex_variable:
   key1:
     key2: 'text'
   value: 'Complex variable test'
+
+# tests for plural source strings
+plural_string: "1 place\x03@count places"
+plural_string_with_context: "1 comment\x03@count comments"

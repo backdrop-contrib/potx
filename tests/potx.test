@@ -468,6 +468,9 @@ class PotxTestCase extends DrupalWebTestCase {
     $this->assertNoMsgID('Basic variable (custom)');
     $this->assertNoMsgID('Parent variable (custom)');
     $this->assertNoMsgID('Key variable (custom)');
+
+    $this->assertPluralID('1 place', '@count places');
+    $this->assertPluralID('1 comment', '@count comments', 'Test context');
   }
 
   /**

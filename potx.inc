@@ -1288,7 +1288,7 @@ function _potx_find_context($tf, $ti, $file, $function_name) {
         $ti++;
         if (!is_array($_potx_tokens[$ti])) {
           // Treat each () and [] pair as going into / out of nesting levels.
-          // There may be function or method calls as well as nested short 
+          // There may be function or method calls as well as nested short
           // arrays within the arguments list. The list may be similar to:
           // array('langcode' => $obj->someMethod([])[2], 'context' => 'Long month name')
           // or
@@ -2202,7 +2202,7 @@ function _potx_process_config_schema($schema_prefix, $schema_data) {
     // extracting translatable strings from contrib projects, until
     // https://www.drupal.org/node/1933988 gets in.
     $_potx_processed_schema = array(
-      'translatables' => array('label', 'text', 'date_format'),
+      'translatables' => array('label', 'text', 'date_format', 'plural_label'),
       'types' => array(),
       'mappings' => array(),
       'contexts' => array('date_format' => 'PHP date format'),
@@ -2480,7 +2480,15 @@ function _potx_find_shipped_config_translatables($config, $schema_prefix, $confi
       $context = POTX_CONTEXT_NONE;
     }
 
-    $save_callback(addcslashes($config, "\0..\37\\\""), $context, $file_name);
+    if (strpos($config, "\03") !== FALSE) {
+      // Convert plural formatting from config to plural formatting in our
+      // format (replacing \03 with \0).
+      list($singular, $plural) = explode("\03", $config);
+      $save_callback(addcslashes($singular, "\0..\37\\\"") . "\0" . addcslashes($plural, "\0..\37\\\""), $context, $file_name);
+    }
+    else {
+      $save_callback(addcslashes($config, "\0..\37\\\""), $context, $file_name);
+    }
   }
   else {
     // Resolve the config element's type in schema to a real type, replacing all
