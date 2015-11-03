@@ -32,6 +32,7 @@ function potx_drush_command() {
       'potx --files=sites/all/modules/example/example.module' => 'Extract translatable strings from example.module and write to single output file.',
       'potx single --api=8 --folder=projects/drupal/8' => 'Extract strings from folder projects/drupal/8 using API version 8.',
     ),
+    'bootstrap' => DRUSH_BOOTSTRAP_NONE,
   );
   return $items;
 }
