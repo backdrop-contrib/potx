@@ -66,6 +66,7 @@ function potx_drush_help($section) {
 function potx_drush_extract($mode = NULL) {
   // Include library.
   include_once __DIR__ . '/potx.inc';
+  include_once __DIR__ . '/potx.local.inc';
 
   $files = array();
   $build_mode = POTX_BUILD_SINGLE;
@@ -85,6 +86,8 @@ function potx_drush_extract($mode = NULL) {
   if (empty($api_option) || !in_array($api_option, array(5, 6, 7, 8))) {
     $api_option = POTX_API_CURRENT;
   }
+
+  potx_local_init($folder_option);
 
   if (!empty($modules_option)) {
     $modules = explode(',', $modules_option);

@@ -21,6 +21,8 @@ class PotxTestCase extends DrupalWebTestCase {
 
     // Add potx.inc which we test for its functionality.
     include_once(__DIR__ . '/../potx.inc');
+    include_once(__DIR__ . '/../potx.local.inc');
+    potx_local_init();
     // Store empty error message for reuse in multiple cases.
     $this->empty_error = t('Empty string attempted to be localized. Please do not leave test code for localization in your source.');
   }
@@ -405,6 +407,7 @@ class PotxTestCase extends DrupalWebTestCase {
     global $_potx_store, $_potx_strings, $_potx_install;
     $_potx_store = $_potx_strings = $_potx_install = array();
     $test_d8_path = __DIR__ . '/drupal8';
+
     $files = _potx_explore_dir($test_d8_path, '*', POTX_API_8, TRUE);
 
     foreach ($files as $file) {

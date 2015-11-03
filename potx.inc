@@ -389,12 +389,20 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
  */
 function potx_finish_processing($save_callback = '_potx_save_string', $api_version = POTX_API_CURRENT) {
   global $yaml_translation_patterns;
+  global $_potx_module_metadata;
+  global $potx_callbacks;
+
   if ($api_version > POTX_API_7) {
+    foreach ($_potx_module_metadata as $module_name => $module_metadata) {
+      $potx_callbacks['store_module_metadata']($module_name, $module_metadata);
+    }
+
     // Parsing shipped configuration has to happen after processing all schemas.
     _potx_parse_shipped_configuration($save_callback, $api_version);
     // Clear yaml translation patterns, so translation patterns for a module
     // won't be used for extracting translatable strings for another module.
     $yaml_translation_patterns = NULL;
+
   }
 }
 
@@ -2047,34 +2055,46 @@ function _potx_load_yaml_translation_patterns($path) {
  */
 function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
   global $yaml_translation_patterns;
-  global $_potx_config_set;
+  global $potx_callbacks;
+  global $_potx_module_metadata;
 
   if (!is_array($yaml_translation_patterns)) {
     _potx_init_yaml_translation_patterns();
   }
 
+  try {
+    $yaml = Yaml::parse($code);
+
+    // Don't try to process empty yaml files.
+    if (!is_array($yaml)) {
+      return;
+    }
+  } catch (ParseException $e) {
+    watchdog('potx', "YAML parsing error on file @path: @error", array(
+        '@path' => $file_path,
+        '@error' => $e->getMessage(),
+    ));
+
+    return;
+  }
+
   foreach ($yaml_translation_patterns as $pattern => $trans_list) {
     if (fnmatch($pattern, $file_name) || fnmatch('*/' . $pattern, $file_name)) {
-      try {
-        $yaml = Yaml::parse($code);
-        _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback, TRUE);
-      } catch (ParseException $e) {
-        watchdog('potx', "YAML parseing error on file @path: @error", array(
-          '@path' => $file_path,
-          '@error' => $e->getMessage(),
-        ));
-      }
+      _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_callback, TRUE);
     }
   }
 
-  if (preg_match('~config/schema/[^/]+\.yml$~', $file_name)) {
-    $schema = Yaml::parse($code);
-    foreach ($schema as $key => $element) {
-      _potx_process_config_schema($key, $element);
+  if (preg_match('~config/(schema|install|optional)/[^/]+\.yml$~', $file_name, $matches)) {
+    $module_name = basename(dirname(dirname(dirname($file_name))));
+    $_potx_module_metadata[$module_name]['config'][$matches[1]][] = array($file_name, $file_path);
+    if ($matches[1] == 'schema') {
+      $keys = array_keys($yaml);
+      $potx_callbacks['schema_store_lookup']($keys, $module_name);
     }
   }
-  elseif (preg_match('~config/(install|optional)/[^/]+\.yml$~', $file_name)) {
-    $_potx_config_set[] = array($file_name, $file_path);
+  elseif (preg_match('~[^/]+.info.yml~', $file_name)) {
+    $module_name = basename(dirname($file_name));
+    $_potx_module_metadata[$module_name]['dependencies'] = isset($yaml['dependencies']) ? $yaml['dependencies'] : array();
   }
 }
 
@@ -2111,12 +2131,7 @@ function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_cal
         $context = POTX_CONTEXT_NONE;
       }
 
-      if (is_array($value)) {
-        foreach ($value as $item) {
-          $save_callback(addcslashes($item, "\0..\37\\\""), $context, $file_name);
-        }
-      }
-      else {
+      if (!is_array($value)) {
         $save_callback(addcslashes($value, "\0..\37\\\""), $context, $file_name);
       }
     }
@@ -2196,18 +2211,7 @@ function _potx_find_yaml_translatables($yaml, $trans_list, $file_name, $save_cal
  */
 function _potx_process_config_schema($schema_prefix, $schema_data) {
   global $_potx_processed_schema;
-
-  if (!isset($_potx_processed_schema)) {
-    // The initial values for 'translatables' allows a limited support for
-    // extracting translatable strings from contrib projects, until
-    // https://www.drupal.org/node/1933988 gets in.
-    $_potx_processed_schema = array(
-      'translatables' => array('label', 'text', 'date_format', 'plural_label'),
-      'types' => array(),
-      'mappings' => array(),
-      'contexts' => array('date_format' => 'PHP date format'),
-    );
-  }
+  global $_potx_module_schema;
 
   // Elements can opt out of translation with a 'translatable: false' key.
   if (isset($schema_data['translatable']) && $schema_data['translatable'] === FALSE) {
@@ -2232,15 +2236,18 @@ function _potx_process_config_schema($schema_prefix, $schema_data) {
 
     if ($type != 'mapping') {
       $_potx_processed_schema['types'][$schema_prefix] = $type;
+      $_potx_module_schema['types'][$schema_prefix] = $type;
     }
 
     $_potx_processed_schema['mappings'][] = $schema_prefix;
+    $_potx_module_schema['mappings'][] = $schema_prefix;
   }
   else {
     if ($type == 'sequence') {
       $sequence_schema = isset($schema_data['sequence'][0]) ? $schema_data['sequence'][0] : $schema_data['sequence'];
       _potx_process_config_schema($schema_prefix . '+sequence', $sequence_schema);
       $_potx_processed_schema['types'][$schema_prefix] = 'sequence';
+      $_potx_module_schema['types'][$schema_prefix] = 'sequence';
     }
     // If the element's type is in the "translatables" list, or it has a
     // 'translatable: true' key, then it is translatable.
@@ -2248,18 +2255,22 @@ function _potx_process_config_schema($schema_prefix, $schema_data) {
             || (isset($schema_data['translatable'])
                 && $schema_data['translatable'] === TRUE)) {
       $_potx_processed_schema['translatables'][] = $schema_prefix;
+      $_potx_module_schema['translatables'][] = $schema_prefix;
 
       // Elements can define a context string, or inherit the context from their
       // defined type.
       if (isset($schema_data['translation context'])) {
         $_potx_processed_schema['contexts'][$schema_prefix] = $schema_data['translation context'];
+        $_potx_module_schema['contexts'][$schema_prefix] = $schema_data['translation context'];
       }
       elseif (isset($_potx_processed_schema['contexts'][$type])) {
         $_potx_processed_schema['contexts'][$schema_prefix] = $_potx_processed_schema['contexts'][$type];
+        $_potx_module_schema['contexts'][$schema_prefix] = $_potx_processed_schema['contexts'][$type];
       }
     }
     else {
       $_potx_processed_schema['types'][$schema_prefix] = $type;
+      $_potx_module_schema['types'][$schema_prefix] = $type;
     }
   }
 }
@@ -2278,6 +2289,31 @@ function _potx_element_has_schema($type) {
   return in_array($type, $_potx_processed_schema['translatables'])
          || in_array($type, $_potx_processed_schema['mappings'])
          || isset($_potx_processed_schema['types'][$type]);
+}
+
+/**
+ * Finds the possible schema keys that match with a config element name.
+ *
+ * @param string $name
+ *   Name of the config element.
+ */
+function _potx_find_matching_schema_candidates($name) {
+  $candidates = array($name);
+
+  $replaced = preg_replace('/([^.:]+)([.:*]*)$/', '*\2', $name);
+  if ($replaced != $name) {
+    $candidates[] = $replaced;
+
+    $one_star = preg_replace('/\.([:.*]*)$/', '.*', $replaced);
+    if ($one_star != $replaced) {
+      $candidates[] = $one_star;
+    }
+
+    $candidates = array_merge($candidates, _potx_find_matching_schema_candidates($replaced));
+    $candidates = array_unique($candidates);
+  }
+
+  return $candidates;
 }
 
 /**
@@ -2310,8 +2346,6 @@ function _potx_element_has_schema($type) {
  *     block.*
  */
 function _potx_find_matching_schema($name) {
-  global $_potx_processed_schema;
-
   if (_potx_element_has_schema($name)) {
     return $name;
   }
@@ -2336,6 +2370,8 @@ function _potx_find_matching_schema($name) {
       return _potx_find_matching_schema($replaced);
     }
   }
+
+  return NULL;
 }
 
 /**
@@ -2422,28 +2458,195 @@ function _potx_replace_variable($value, $data) {
  * @param string $api_version
  */
 function _potx_parse_shipped_configuration($save_callback = '_potx_save_string', $api_version = POTX_API_CURRENT) {
-  global $_potx_config_set;
-  if (!is_array($_potx_config_set)) {
-    return;
-  }
+  global $_potx_module_metadata;
+  global $_potx_processed_schema;
+  global $_potx_processed_modules;
+  global $potx_callbacks;
 
-  foreach ($_potx_config_set as $config_paths) {
-    // Find the schema that matches the config file.
-    $path_info = pathinfo($config_paths[1]);
-    $config_name = $path_info['filename'];
-    $schema = _potx_find_matching_schema($config_name);
+  foreach ($_potx_module_metadata as $module_name => $module_metadata) {
+    if (!isset($module_metadata['config']['install']) &&
+        !isset($module_metadata['config']['optional'])) {
 
-    if ($schema == '') {
-      // No schema was found matching this config.
       continue;
     }
 
-    $config_code = file_get_contents($config_paths[1]);
-    $parsed_config = Yaml::parse($config_code);
-    unset($config_code);
+    // Reset the processed schema for every module.
+    $_potx_processed_modules = array();
+    $_potx_processed_schema = array(
+        'translatables' => array(),
+        'types' => array(),
+        'mappings' => array(),
+        'contexts' => array()
+    );
 
-    _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_paths[0], $save_callback);
+    // "core" contains the base data type and translatable definitions.
+    _potx_process_module_schemas(array('core'));
+    _potx_process_module_schemas(array($module_name));
+
+    if (isset($module_metadata['config']['install'])) {
+      foreach ($module_metadata['config']['install'] as $config_paths) {
+
+        $config_code = file_get_contents($config_paths[1]);
+        $parsed_config = Yaml::parse($config_code);
+        unset($config_code);
+
+        // Dependencies defined in a config file itself should not be visible
+        // to other config files. So, make a temp copy here, and revert after
+        // parsing the config file.
+        $temp = $_potx_processed_schema;
+        if (isset($parsed_config['dependencies']['module'])) {
+          _potx_process_module_schemas($parsed_config['dependencies']['module']);
+        }
+
+        // Find the schema that matches the config file.
+        $path_info = pathinfo($config_paths[1]);
+        $config_name = $path_info['filename'];
+        $schema = _potx_find_matching_schema($config_name);
+
+        if ($schema !== NULL) {
+          _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_paths[0], $save_callback);
+        }
+
+        $_potx_processed_schema = $temp;
+      }
+    }
+
+    if (isset($module_metadata['config']['optional'])) {
+      // Optional configs are different, since they do not explicitly specify
+      // which module they belong to.
+      foreach ($module_metadata['config']['optional'] as $config_paths) {
+
+        $_potx_processed_modules = array();
+        $_potx_processed_schema = array(
+            'translatables' => array(),
+            'types' => array(),
+            'mappings' => array(),
+            'contexts' => array()
+        );
+
+        _potx_process_module_schemas(array('core'));
+
+        // Find the schema that matches the config file.
+        $path_info = pathinfo($config_paths[1]);
+        $config_name = $path_info['filename'];
+
+        $config_code = file_get_contents($config_paths[1]);
+        $parsed_config = Yaml::parse($config_code);
+        unset($config_code);
+
+        $match_candidates = _potx_find_matching_schema_candidates($config_name);
+        $matched = $potx_callbacks['schema_reverse_lookup']($match_candidates);
+
+        if ($matched === NULL) {
+          continue;
+        }
+
+        _potx_process_module_schemas(array($matched));
+
+        if (isset($parsed_config['dependencies']['module'])) {
+          _potx_process_module_schemas($parsed_config['dependencies']['module']);
+        }
+
+        $schema = _potx_find_matching_schema($config_name);
+        _potx_find_shipped_config_translatables($parsed_config, $schema, NULL, NULL, $config_paths[0], $save_callback);
+      }
+    }
   }
+}
+
+/**
+ * Recursively process and merge the schemas required for parsing shipped config.
+ *
+ * Handles module dependencies, and config optional dependencies.
+ *
+ * @param array $module_list
+ *   The list of modules that their schema should be processed.
+ */
+function _potx_process_module_schemas($module_list) {
+  global $_potx_module_metadata;
+  global $_potx_processed_modules;
+  global $_potx_module_schema;
+  global $potx_callbacks;
+
+  // Remove modules that have already been processed.
+  $module_list = array_diff($module_list, $_potx_processed_modules);
+
+  if (count($module_list) == 0) {
+    return;
+  }
+
+  // Mark as processed early, to prevent a loop while traversing dependency graph.
+  $_potx_processed_modules = array_merge($_potx_processed_modules, $module_list);
+
+  $dependencies = array();
+
+  // Gather list of all dependencies for the current $module_list.
+  foreach ($module_list as $module_name) {
+
+    // If the module is directly available from the initial given path, their
+    //  metadata is already available.
+    if (isset($_potx_module_metadata[$module_name])) {
+      if (!empty($_potx_module_metadata[$module_name]['dependencies'])) {
+        $dependencies = array_merge($dependencies, $_potx_module_metadata[$module_name]['dependencies']);
+      }
+    }
+    else {
+      // Try to load the module metadata from the globally available modules
+      //  (e.g. drupal install directory in local potx, database in l10n_server)
+      if ($potx_callbacks['load_module_metadata']($module_name)) {
+        $dependencies = array_merge($dependencies, $_potx_module_metadata[$module_name]['dependencies']);
+      }
+    }
+  }
+
+  if (!empty($dependencies)) {
+    // Process schema for dependencies first.
+    _potx_process_module_schemas($dependencies);
+  }
+
+  // If the schema for a module is already available, merge it.
+  foreach ($module_list as $module_name) {
+    $module_schema = $potx_callbacks['schema_load']($module_name);
+    if ($module_schema !== NULL) {
+      _potx_merge_processed_schema($module_schema);
+
+      // Remove from list of unprocessed modules.
+      unset($module_list[array_search($module_name, $module_list)]);
+    }
+  }
+
+  foreach ($module_list as $module_name) {
+    if (!empty($_potx_module_metadata[$module_name]['config']['schema'])) {
+      $_potx_module_schema = array(
+          'translatables' => array(),
+          'types' => array(),
+          'mappings' => array(),
+          'contexts' => array()
+      );
+
+      foreach ($_potx_module_metadata[$module_name]['config']['schema'] as $file_paths) {
+        $code = file_get_contents($file_paths[1]);
+        $yaml = Yaml::parse($code);
+        foreach ($yaml as $key => $element) {
+          _potx_process_config_schema($key, $element);
+        }
+      }
+
+      $potx_callbacks['schema_store']($module_name);
+    }
+  }
+}
+
+/**
+ * Merge a module's processed schema with the global schema storage.
+ */
+function _potx_merge_processed_schema($schema) {
+  global $_potx_processed_schema;
+
+  $_potx_processed_schema['translatables'] = array_merge($_potx_processed_schema['translatables'], $schema['translatables']);
+  $_potx_processed_schema['types'] = array_merge($_potx_processed_schema['types'], $schema['types']);
+  $_potx_processed_schema['mappings'] = array_merge($_potx_processed_schema['mappings'], $schema['mappings']);
+  $_potx_processed_schema['contexts'] = array_merge($_potx_processed_schema['contexts'], $schema['contexts']);
 }
 
 /**
