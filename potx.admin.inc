@@ -69,6 +69,7 @@ function potx_select_component_form_submit($form, &$form_state) {
   // This could take some time.
   @set_time_limit(0);
   module_load_include('inc', 'potx');
+  module_load_include('inc', 'potx', 'potx.local');
 
   // Silence status messages.
   potx_status('set', POTX_STATUS_MESSAGE);
