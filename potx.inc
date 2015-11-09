@@ -1873,23 +1873,20 @@ function _potx_process_twig_trans_tag($stream, $file, $save_callback) {
       $token = $stream->next();
       $name[] = $token->getValue();
 
-      $name = implode('.', $name);
-      // Figure out if it's escaped, passthrough, or placeholder.
+      // Figure out if it's escaped or placeholder.
+      $prefix = '@';
       $token = $stream->next();
-      // If the next thing we see is }}, this is escaped.
-      if ($token->test(Twig_Token::VAR_END_TYPE)) {
-        $text[] = "@$name";
-      }
-      // If the next thing we see is |, this is either passthrough or placeholder.
-      elseif ($token->test(Twig_Token::PUNCTUATION_TYPE, '|')) {
+      // If the next thing we see is |, this may be a placeholder. The only
+      // "filter" supported is placeholder, so if there is any other filter
+      // then we keep assuming it is to be escaped. (Even if later a
+      // placeholder filter was attempted).
+      if ($token->test(Twig_Token::PUNCTUATION_TYPE, '|')) {
         $token = $stream->next();
-        if ($token->getValue() == 'passthrough') {
-          $text[] = "!$name";
-        }
-        elseif ($token->getValue() == 'placeholder') {
-          $text[] = "%$name";
+        if ($token->getValue() == 'placeholder') {
+          $prefix = '%';
         }
       }
+      $text[] = $prefix . implode('.', $name);
     }
     $token = $stream->next();
   }

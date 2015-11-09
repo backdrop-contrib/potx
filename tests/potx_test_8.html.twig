@@ -63,11 +63,6 @@
 </div>
 <div>
   {% trans %}
-    Pass-through: {{ string|passthrough }}
-  {% endtrans %}
-</div>
-<div>
-  {% trans %}
     Placeholder: {{ string|placeholder }}
   {% endtrans %}
 </div>
@@ -77,7 +72,7 @@
 {% set count = token|length %}
 <div>
   {% trans %}
-    This {{ node.type }} is submitted by {{ author.name }}, and has a length of: {{ count }}. It contains: {{ node.numbers|placeholder }} and {{ node.bad_text }}. Lets pass the bad text through: {{ node.bad_text|passthrough }}.
+    This {{ node.type }} is submitted by {{ author.name }}, and has a length of: {{ count }}. It contains: {{ node.numbers|placeholder }} and {{ node.bad_text }}.
   {% endtrans %}
 </div>
 {# Test trans tag with context. #}
@@ -104,4 +99,19 @@
     A multiline
     trans block.
   {% endtrans %}
+</div>
+<div>
+{% trans %}
+  Test string with {{ extra_filter|abs }}
+{% endtrans %}
+</div>
+<div>
+{% trans %}
+  Test string with {{ multiple_filters|abs|placeholder }}
+{% endtrans %}
+</div>
+<div>
+{% trans %}
+  Test string with {{ multiple_filters|placeholder|abs }}
+{% endtrans %}
 </div>
