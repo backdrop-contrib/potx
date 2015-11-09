@@ -45,3 +45,5 @@ test.settings:
       type: plural_string
     plural_string_with_context:
       type: plural_string_with_context
+    test_boolean_based_variable:
+      type: test_boolean_based_variable

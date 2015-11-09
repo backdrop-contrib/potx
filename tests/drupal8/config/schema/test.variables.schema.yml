@@ -46,3 +46,14 @@ complex_variable:
           type: string
     value:
       type: variable.[%parent.key1.key2]
+
+test_boolean_based_variable:
+  type: mapping
+  mapping:
+    boolean:
+      type: boolean
+    value:
+      type: test_boolean_based_variable.[%parent.boolean]
+
+test_boolean_based_variable.0:
+  type: label

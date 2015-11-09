@@ -58,6 +58,9 @@ complex_variable:
   key1:
     key2: 'text'
   value: 'Complex variable test'
+test_boolean_based_variable:
+  boolean: false
+  value: 'Test boolean based variable'
 
 # tests for plural source strings
 plural_string: "1 place\x03@count places"

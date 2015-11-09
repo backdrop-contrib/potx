@@ -2439,8 +2439,12 @@ function _potx_replace_variable($value, $data) {
       return $value;
     }
     elseif (!$parts) {
+      $value = $data[$name];
+      if (is_bool($value)) {
+        $value = (int) $value;
+      }
       // If no more parts left, this is the final property.
-      return (string)$data[$name];
+      return (string) $value;
     }
     else {
       $data = $data[$name];
