@@ -1764,7 +1764,17 @@ function _potx_parse_js_string($string) {
  */
 function _potx_parse_twig_file($code, $file, $save_callback) {
   $twig_lexer = new Twig_Lexer(new Twig_Environment());
-  $stream = $twig_lexer->tokenize($code, $file);
+
+  try {
+    $stream = $twig_lexer->tokenize($code, $file);
+  } catch(Twig_Error_Syntax $e) {
+    potx_status('error', t("Twig parsing error on file @path: @error", array(
+        '@path' => $file,
+        '@error' => $e->getMessage(),
+    )), $file);
+
+    return;
+  }
 
   while (!$stream->isEOF()) {
     $token = $stream->next();
@@ -2021,7 +2031,11 @@ function _potx_init_yaml_translation_patterns($path = '') {
 function _potx_load_yaml_translation_patterns($path) {
   global $yaml_translation_patterns;
 
-  $content = Yaml::parse(file_get_contents($path));
+  $content = _potx_parse_yaml($path);
+
+  if ($content === NULL) {
+    return;
+  }
 
   if (isset($content['translation_patterns'])) {
     $patterns = $content['translation_patterns'];
@@ -2067,10 +2081,10 @@ function _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback) {
       return;
     }
   } catch (ParseException $e) {
-    watchdog('potx', "YAML parsing error on file @path: @error", array(
+    potx_status('error', t("YAML parsing error on file @path: @error", array(
         '@path' => $file_path,
         '@error' => $e->getMessage(),
-    ));
+    )), $file_path);
 
     return;
   }
@@ -2487,9 +2501,11 @@ function _potx_parse_shipped_configuration($save_callback = '_potx_save_string',
     if (isset($module_metadata['config']['install'])) {
       foreach ($module_metadata['config']['install'] as $config_paths) {
 
-        $config_code = file_get_contents($config_paths[1]);
-        $parsed_config = Yaml::parse($config_code);
-        unset($config_code);
+        $parsed_config = _potx_parse_yaml($config_paths[1]);
+
+        if ($parsed_config === NULL) {
+          continue;
+        }
 
         // Dependencies defined in a config file itself should not be visible
         // to other config files. So, make a temp copy here, and revert after
@@ -2531,9 +2547,10 @@ function _potx_parse_shipped_configuration($save_callback = '_potx_save_string',
         $path_info = pathinfo($config_paths[1]);
         $config_name = $path_info['filename'];
 
-        $config_code = file_get_contents($config_paths[1]);
-        $parsed_config = Yaml::parse($config_code);
-        unset($config_code);
+        $parsed_config = _potx_parse_yaml($config_paths[1]);
+        if ($parsed_config === NULL) {
+          continue;
+        }
 
         $match_candidates = _potx_find_matching_schema_candidates($config_name);
         $matched = $potx_callbacks['schema_reverse_lookup']($match_candidates);
@@ -2553,6 +2570,33 @@ function _potx_parse_shipped_configuration($save_callback = '_potx_save_string',
       }
     }
   }
+}
+
+/**
+ * Helper function for parsing yaml files.
+ *
+ * @param string $yaml_path
+ *   Path to the yaml file.
+ *
+ * @return array
+ *   The parsed yaml, if it contains valid yaml. NULL if it's invalid or empty.
+ */
+function _potx_parse_yaml($yaml_path) {
+
+  try {
+    $code = file_get_contents($yaml_path);
+    $yaml = Yaml::parse($code);
+
+    return $yaml;
+
+  } catch (ParseException $e) {
+    potx_status('error', t("YAML parsing error on file @path: @error", array(
+        '@path' => $yaml_path,
+        '@error' => $e->getMessage(),
+    )), $yaml_path);
+  }
+
+  return NULL;
 }
 
 /**
@@ -2626,8 +2670,11 @@ function _potx_process_module_schemas($module_list) {
       );
 
       foreach ($_potx_module_metadata[$module_name]['config']['schema'] as $file_paths) {
-        $code = file_get_contents($file_paths[1]);
-        $yaml = Yaml::parse($code);
+        $yaml = _potx_parse_yaml($file_paths[1]);
+        if ($yaml === NULL) {
+          continue;
+        }
+
         foreach ($yaml as $key => $element) {
           _potx_process_config_schema($key, $element);
         }
