@@ -396,7 +396,6 @@ function potx_finish_processing($save_callback = '_potx_save_string', $api_versi
     foreach ($_potx_module_metadata as $module_name => $module_metadata) {
       $potx_callbacks['store_module_metadata']($module_name, $module_metadata);
     }
-
     // Parsing shipped configuration has to happen after processing all schemas.
     _potx_parse_shipped_configuration($save_callback, $api_version);
     // Clear yaml translation patterns, so translation patterns for a module
@@ -2295,6 +2294,10 @@ function _potx_process_config_schema($schema_prefix, $schema_data) {
 function _potx_element_has_schema($type) {
   global $_potx_processed_schema;
 
+  if (empty($_potx_processed_schema)) {
+    return FALSE;
+  }
+
   // If an element doesn't exist in any of the extracted lists, it hasn't been
   // defined in schema. This is checked during processing shipped config.
   return in_array($type, $_potx_processed_schema['translatables'])
@@ -2652,8 +2655,13 @@ function _potx_process_module_schemas($module_list) {
   // If the schema for a module is already available, merge it.
   foreach ($module_list as $module_name) {
     $module_schema = $potx_callbacks['schema_load']($module_name);
-    if ($module_schema !== NULL) {
-      _potx_merge_processed_schema($module_schema);
+
+    // If the module is not in the current parsed project, and its config schema can be found in the database
+    if (!isset($_potx_module_metadata[$module_name]['config']['schema']) && $module_schema !== NULL) {
+      // If its config schema isn't empty
+      if (!empty($module_schema['types'])) {
+        _potx_merge_processed_schema($module_schema);
+      }
 
       // Remove from list of unprocessed modules.
       unset($module_list[array_search($module_name, $module_list)]);
