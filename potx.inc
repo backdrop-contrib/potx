@@ -2485,12 +2485,6 @@ function _potx_parse_shipped_configuration($save_callback = '_potx_save_string',
   global $potx_callbacks;
 
   foreach ($_potx_module_metadata as $module_name => $module_metadata) {
-    if (!isset($module_metadata['config']['install']) &&
-        !isset($module_metadata['config']['optional'])) {
-
-      continue;
-    }
-
     // Reset the processed schema for every module.
     $_potx_processed_modules = array();
     $_potx_processed_schema = array(
