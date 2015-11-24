@@ -23,3 +23,7 @@ bc_sequence:
   type: sequence
   sequence:
     - type: label
+
+empty_sequence:
+  type: sequence
+  label: 'Empty sequence test'

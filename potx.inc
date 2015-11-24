@@ -2254,6 +2254,9 @@ function _potx_process_config_schema($schema_prefix, $schema_data) {
   }
   else {
     if ($type == 'sequence') {
+      if (!isset($schema_data['sequence'])) {
+        return;
+      }
       $sequence_schema = isset($schema_data['sequence'][0]) ? $schema_data['sequence'][0] : $schema_data['sequence'];
       _potx_process_config_schema($schema_prefix . '+sequence', $sequence_schema);
       $_potx_processed_schema['types'][$schema_prefix] = 'sequence';
