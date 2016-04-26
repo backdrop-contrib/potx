@@ -170,6 +170,9 @@ class PotxTestCase extends DrupalWebTestCase {
     // Context support added.
     $this->assertMsgIDContext('Test string in context', 'Test context');
 
+    // Drush support.
+    $this->assertMsgID('This could have been in a drush file');
+
     // Look at installer strings.
     $this->parseFile($filename, POTX_API_7, POTX_STRING_INSTALLER);
     $this->assertMsgID('Installer only test string');

@@ -290,6 +290,8 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     // This does not support context even in Drupal 7.
     _potx_find_t_calls($file_name, $save_callback, '_locale_import_message', POTX_STRING_BOTH);
   }
+  // dt() in drush does not support context either.
+  _potx_find_t_calls($file_name, $save_callback, 'dt');
 
   if ($api_version > POTX_API_5) {
     // Watchdog calls have both of their arguments translated from Drupal 6.x.
