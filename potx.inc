@@ -12,10 +12,6 @@
  *   functions can be implemented to use the functionality provided here as an
  *   API for Drupal code to translatable string conversion.
  *
- *   The potx-cli.php script can be used with this include file as
- *   a command line interface to string extraction. The potx.module
- *   can be used as a web interface for manual extraction.
- *
  *   For a module using potx as an extraction API, but providing more
  *   sophisticated functionality on top of it, look into the
  *   'Localization server' module: http://drupal.org/project/l10n_server
@@ -2944,7 +2940,7 @@ function _potx_explore_dir($path = '', $basename = '*', $api_version = POTX_API_
   }
 
   // Skip API and test files. Also skip our own files, if that was requested.
-  $skip_pattern = ($skip_self ? '!(potx-cli\.php|potx\.inc|\.api\.php|\.test)$!' : '!(\.api\.php|\.test)$!');
+  $skip_pattern = ($skip_self ? '!(potx\.inc|\.api\.php|\.test)$!' : '!(\.api\.php|\.test)$!');
   foreach ($files as $id => $file_name) {
     if (preg_match($skip_pattern, $file_name)) {
       unset($files[$id]);
