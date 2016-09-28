@@ -2726,7 +2726,7 @@ function _potx_merge_processed_schema($schema) {
 function _potx_find_shipped_config_translatables($config, $schema_prefix, $config_key, $config_parent, $file_name, $save_callback) {
   global $_potx_processed_schema;
 
-  if (in_array($schema_prefix, $_potx_processed_schema['translatables'])) {
+  if (in_array($schema_prefix, $_potx_processed_schema['translatables']) && is_string($config)) {
     if (isset($_potx_processed_schema['contexts'][$schema_prefix])) {
       $context = $_potx_processed_schema['contexts'][$schema_prefix];
     }
@@ -2781,7 +2781,7 @@ function _potx_find_shipped_config_translatables($config, $schema_prefix, $confi
     }
 
     // Check the keys belonging to config element's schema's "mapping" key.
-    if (in_array($schema_prefix, $_potx_processed_schema['mappings'])) {
+    if (in_array($schema_prefix, $_potx_processed_schema['mappings']) && is_array($config)) {
       foreach ($config as $key => $element) {
         // '%key' and '%parent' keys are added to $config by potx. skip them.
         if ($key === '%parent' || $key === '%key' || empty($element)) {
