@@ -48,7 +48,7 @@ function _potx_find_all_modules($module_path) {
     $module_path = $module_path . '/';
   }
 
-  // The list of directories to check in the path, to find out if we are in a Drupal install directory.
+  // The list of directories to check in the path, to find out if we are in a Backdrop install directory.
   $checks = array('/sites/', '/core/', '/profiles/', '/modules/', '/themes/');
 
   // The list of paths that could contain "modules/" or "themes/" subdirectories.
@@ -58,10 +58,10 @@ function _potx_find_all_modules($module_path) {
     if (preg_match("!$check!", $module_path)) {
       $parts = explode($check, $module_path, 2);
 
-      // The installed Drupal root.
+      // The installed Backdrop root.
       $root = $parts[0];
 
-      // The Drupal core directory contains a config/schema subdirectory, which
+      // The Backdrop core directory contains a config/schema subdirectory, which
       //  is not part of any module or theme.
       $_potx_found_modules['core']['path'] = $root . '/core';
 

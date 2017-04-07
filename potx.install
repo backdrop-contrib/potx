@@ -9,7 +9,7 @@
  * Implementation of hook_requirements().
  *
  * The translation template extractor requires the PHP token extension to
- * be enabled. We should not let Drupal to install the module if this is
+ * be enabled. We should not let Backdrop to install the module if this is
  * not available. Also, if it was available, but the site was moved or
  * PHP was changed, we should nag again: so we run in install and runtime
  * as well.

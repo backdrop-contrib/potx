@@ -2,11 +2,11 @@
 
 /**
  * @file
- *   Drupal translation template extractor.
+ *   Backdrop translation template extractor.
  *
- *   This module helps people extract translatable strings from Drupal source
+ *   This module helps people extract translatable strings from Backdrop source
  *   code. The user interface allows translators to choose which part of the
- *   current Drupal instance to translate. The module also provides an API for
+ *   current Backdrop instance to translate. The module also provides an API for
  *   other modules (such as coder and l10n_server) to use.
  */
 
@@ -26,7 +26,7 @@ function potx_help($path, $arg) {
 function potx_menu() {
   $items['admin/config/regional/translate/extract'] = array(
     'title' => 'Extract',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('potx_select_component_form'),
     'access arguments' => array('translate interface'),
     'weight' => 200,
