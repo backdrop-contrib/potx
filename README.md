@@ -28,7 +28,7 @@ basically two ways to use the contents of this project:
      3.Extract translatable strings from example.module and write to single output file.
        drush potx --files=sites/all/modules/example/example.module
 
-     4.Extract strings from folder 'projects/backdrop/1' using API version 8.
+     4.Extract strings from folder 'projects/backdrop/1' using API version 1.
        drush potx single --api=1 --folder=projects/backdrop/1
 
  * Install the module on a Backdrop site as you would with any other
