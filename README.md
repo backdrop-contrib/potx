@@ -1,4 +1,4 @@
-ABOUT
+Potx
 ================================================================================
 
 The goal of the Translation Template Extractor project is to provide
@@ -46,17 +46,8 @@ The module also includes optional Coder (http://drupal.org/project/coder)
 integration, allowing you to spot translatability errors in modules while
 doing your regular code review.
 
-CREDITS
+Credits
 ================================================================================
-
-Command line extractor functionality orignally by
-  Jacobo Tarrio <jtarrio [at] alfa21.com> (2003, 2004 Alfa21 Outsourcing)
-
-Greatly optimized by
-  Brandon Bergren (2007)
-
-Currently maintained by
-  Gabor Hojtsy <gabor [at] hojtsy.hu>
 
 Ported to Backdrop
 ---
@@ -68,3 +59,15 @@ Maintainers
 
 * Geoff St. Pierre [@serundeputy](https://github.com/serundeputy)
 * Seeking additional maintainers
+
+Originally Authored for Drupal
+---
+
+Command line extractor functionality orignally by
+  Jacobo Tarrio <jtarrio [at] alfa21.com> (2003, 2004 Alfa21 Outsourcing)
+
+Greatly optimized by
+  Brandon Bergren (2007)
+
+Drupal Currently maintained by
+  Gabor Hojtsy <gabor [at] hojtsy.hu>
