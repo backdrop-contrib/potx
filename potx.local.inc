@@ -35,7 +35,7 @@ function potx_local_init($module_path = NULL) {
 }
 
 /**
- * Find all available modules based on Drupal 8's directory structure.
+ * Find all available modules based on Backdrop's directory structure.
  *
  * @param string $module_path
  *   Path to the module that is being parsed by potx.
@@ -61,8 +61,8 @@ function _potx_find_all_modules($module_path) {
       // The installed Backdrop root.
       $root = $parts[0];
 
-      // The Backdrop core directory contains a config/schema subdirectory, which
-      //  is not part of any module or theme.
+      // The Backdrop core directory contains a config/schema subdirectory,
+      // which is not part of any module or theme.
       $_potx_found_modules['core']['path'] = $root . '/core';
 
       $search_paths[] = $root;

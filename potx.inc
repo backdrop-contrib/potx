@@ -204,16 +204,10 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
     _potx_find_info_file_strings($file_path, $file_name, $save_callback, $api_version);
     return;
   }
-  // elseif ($name_parts['extension'] == 'yml' && $api_version > POTX_API_7) {
-  //   _potx_parse_yaml_file($code, $file_name, $file_path, $save_callback);
-  // }
   elseif ($name_parts['extension'] == 'js') {
     // @todo: D7 context support.
     _potx_parse_js_file($code, $file_name, $save_callback);
   }
-  // elseif ($name_parts['extension'] == 'twig' && $api_version > POTX_API_7) {
-  //   _potx_parse_twig_file($code, $file_name, $save_callback);
-  // }
 
   // Extract raw PHP language tokens.
   $raw_tokens = token_get_all($code);
@@ -230,14 +224,12 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
       if (is_array($token)) {
         $token[] = $line_number;
 
-         $constraint_match = $constraint_extract && $token[0] == T_VARIABLE && strlen($token[1]) >= 7 && substr_compare($token[1], 'message', -7, 7, true) === 0;
-
          // Fill array for finding token offsets quickly.
-         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t') || $constraint_match
+         if (in_array($token[0], array(T_STRING, T_DOC_COMMENT)) || ($token[0] == T_VARIABLE && $token[1] == '$t')
              || ($token[0] == T_CONSTANT_ENCAPSED_STRING && ($token[1] == "'#template'" || $token[1] == '"#template"'))) {
 
            // Give doc comments a specific key because their content varies.
-           $key = ($token[0] == T_DOC_COMMENT) ? 'T_DOC_COMMENT' : ($constraint_match ? 'T_POTX_CONSTRAINT' : $token[1]);
+           $key = ($token[0] == T_DOC_COMMENT) ? 'T_DOC_COMMENT' : $token[1];
            // Normalise "#template" token to support both single-quoted and double-quoted #template keys.
            if ($key == '"#template"') {
              $key = "'#template'";
@@ -287,10 +279,6 @@ function _potx_process_file($file_path, $strip_prefix = 0, $save_callback = '_po
   if ($name_parts['extension'] == 'module') {
     // @todo: if tabs are not defined on the menu hook anymore, exclude this for 8.
     _potx_find_menu_hooks($file_name, $name_parts['filename'], $save_callback);
-  }
-
-  if ($constraint_extract) {
-    _potx_find_constraint_messages($file_name, $save_callback);
   }
 
   // Special handling of some Backdrop core files.
@@ -1553,16 +1541,16 @@ function _potx_find_info_file_strings($file_path, $file_name, $save_callback, $a
  *
  * @DEBUG: D6 only?
  *
- * Extracts strings wrapped in Drupal.t() and Drupal.formatPlural()
+ * Extracts strings wrapped in Backdrop.t() and Backdrop.formatPlural()
  * calls and inserts them into potx storage.
  *
  * Regex code lifted from _locale_parse_js_file().
  */
 function _potx_parse_js_file($code, $file, $save_callback) {
-  // Match all calls to Drupal.t() in an array.
+  // Match all calls to Backdrop.t() in an array.
   // Note: \s also matches newlines with the 's' modifier.
   preg_match_all('~
-    [^\w]Drupal\s*\.\s*t\s*                     # match "Drupal.t" with whitespace
+    [^\w](?:Backdrop|Drupal)\s*\.\s*t\s*        # match "Backdrop.t" or "Drupal.t" with whitespace
     \(\s*                                       # match "(" argument list start
     (' . POTX_JS_STRING . ')\s*                 # capture string argument
     (?:,\s*' . POTX_JS_OBJECT . '\s*            # optionally capture str args
@@ -1571,10 +1559,10 @@ function _potx_parse_js_file($code, $file, $save_callback) {
     \)                                          # match ")" to finish
     ~sx', $code, $t_matches, PREG_SET_ORDER);
 
-  // Add strings from Drupal.t().
+  // Add strings from Backdrop.t().
   if (isset($t_matches) && count($t_matches)) {
     foreach ($t_matches as $match) {
-      // Remove match from code to help us identify faulty Drupal.t() calls.
+      // Remove match from code to help us identify faulty Backdrop.t() calls.
       $code = str_replace($match[0], '', $code);
 
       // Get context
@@ -1592,9 +1580,9 @@ function _potx_parse_js_file($code, $file, $save_callback) {
     }
   }
 
-  // Match all Drupal.formatPlural() calls in another array.
+  // Match all Backdrop.formatPlural() calls in another array.
   preg_match_all('~
-    [^\w]Drupal\s*\.\s*formatPlural\s*  # match "Drupal.formatPlural" with whitespace
+    [^\w](?:Backdrop|Drupal)\s*\.\s*formatPlural\s*  # match "Backdrop.formatPlural" or "Drupal.formatPlural" with whitespace
     \(                                  # match "(" argument list start
     \s*.+?\s*,\s*                       # match count argument
     (' . POTX_JS_STRING . ')\s*,\s*     # match singular string argument
@@ -1625,7 +1613,7 @@ function _potx_parse_js_file($code, $file, $save_callback) {
   if (isset($plural_matches) && count($plural_matches)) {
     foreach ($plural_matches as $index => $match) {
       // Remove match from code to help us identify faulty
-      // Drupal.formatPlural() calls later.
+      // Backdrop.formatPlural() calls later.
       $code = str_replace($match[0], '', $code);
 
       // Get context
@@ -1648,13 +1636,13 @@ function _potx_parse_js_file($code, $file, $save_callback) {
     }
   }
 
-  // Any remaining Drupal.t() or Drupal.formatPlural() calls are evil. This
+  // Any remaining Backdrop.t() or Backdrop.formatPlural() calls are evil. This
   // regex is not terribly accurate (ie. code wrapped inside will confuse
   // the match), but we only need some unique part to identify the faulty calls.
-  preg_match_all('~[^\w]Drupal\s*\.\s*(t|formatPlural)\s*\([^)]+\)~s', $code, $faulty_matches, PREG_SET_ORDER);
+  preg_match_all('~[^\w](?:Backdrop|Drupal)\s*\.\s*(t|formatPlural)\s*\([^)]+\)~s', $code, $faulty_matches, PREG_SET_ORDER);
   if (isset($faulty_matches) && count($faulty_matches)) {
     foreach ($faulty_matches as $index => $match) {
-      $message = ($match[1] == 't') ? t('Drupal.t() calls should have a single literal string as their first parameter.') : t('The singular and plural string parameters on Drupal.formatPlural() calls should be literal strings, plural containing a @count placeholder.');
+      $message = ($match[1] == 't') ? t('Backdrop.t() calls should have a single literal string as their first parameter.') : t('The singular and plural string parameters on Backdrop.formatPlural() calls should be literal strings, plural containing a @count placeholder.');
       potx_status('error', $message, $file, NULL, $match[0], 'http://drupal.org/node/323109');
     }
   }
@@ -2224,7 +2212,7 @@ function _potx_process_module_schemas($module_list) {
     }
     else {
       // Try to load the module metadata from the globally available modules
-      //  (e.g. drupal install directory in local potx, database in l10n_server)
+      //  (e.g. Backdrop install directory in local potx, database in l10n_server)
       if ($potx_callbacks['load_module_metadata']($module_name)) {
         $dependencies = array_merge($dependencies, $_potx_module_metadata[$module_name]['dependencies']);
       }
@@ -2527,17 +2515,16 @@ function _potx_save_string($value = NULL, $context = NULL, $file = NULL, $line =
 }
 
 if (!function_exists('t')) {
-  // If invoked outside of Drupal, t() will not exist, but
+  // If invoked outside of Backdrop, t() will not exist, but
   // used to format the error message, so we provide a replacement.
   function t($string, $args = array()) {
     return strtr($string, $args);
   }
 }
 
-if (!function_exists('drupal_parse_info_file')) {
-  // If invoked outside of Drupal, drupal_parse_info_file() will not be available,
-  // but we need this function to properly parse Drupal 6/7 .info files.
-  // Directly copied from common.inc,v 1.756.2.76 2010/02/01 16:01:41 goba Exp.
+if (!function_exists('backdrop_parse_info_file')) {
+  // If invoked outside of Backdrop, backdrop_parse_info_file() will not be
+  // available, but we need this function to properly parse Backdrop .info files.
   function backdrop_parse_info_file($filename) {
     $info = array();
     $constants = get_defined_constants();
