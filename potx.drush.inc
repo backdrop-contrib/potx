@@ -114,7 +114,23 @@ function potx_drush_extract($mode = NULL) {
 
   _potx_build_files(POTX_STRING_RUNTIME, $build_mode);
   _potx_build_files(POTX_STRING_INSTALLER, POTX_BUILD_SINGLE, 'installer');
-  _potx_write_files();
+  $output_filenames = _potx_write_files();
+
+  // Get warnings, if any.
+  $warnings = potx_status('get');
+  if (!empty($warnings)) {
+    drush_print("");
+    drush_print(dt("Warnings encountered (shown in -v verbose mode only)"));
+    drush_print("");
+    foreach ($warnings as $warning) {
+      drush_log(strip_tags(htmlspecialchars_decode($warning, ENT_QUOTES)));
+    }
+  }
+
+  drush_print("");
+  foreach ($output_filenames as $filename) {
+    drush_log(dt('Created output file @filename', array('@filename' => $filename)), 'success');
+  }
 
   drush_print("");
   drush_print(dt("Stats"));
@@ -124,19 +140,10 @@ function potx_drush_extract($mode = NULL) {
     'warnings' => dt('Warnings'),
   );
   $rows = array(array_values($header));
-  // Get errors, if any.
-  $errors = potx_status('get');
   // Get saved strings.
   $strings = _potx_save_string(NULL,  NULL, NULL, 0, POTX_STRING_RUNTIME);
-  $rows[] = array(count($files), count($strings), count($errors));
+  $rows[] = array(count($files), count($strings), count($warnings));
   drush_print_table($rows, TRUE);
-
-  if (!empty($errors)) {
-    drush_print(dt("Errors"));
-    foreach ($errors as $error) {
-      drush_set_error($error);
-    }
-  }
 
   drush_print("");
   drush_print(dt("Done"));

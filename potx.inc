@@ -483,17 +483,14 @@ function _potx_translation_export($translation_export_langcode, $string, $plural
 function _potx_get_header($file, $template_export_langcode = NULL, $api_version = POTX_API_CURRENT) {
   // We only have language to use if we should export with that langcode.
   $language = NULL;
-  // @DEBUG: I have my doubts about this.  I don't see a 'languages' DB table in
-  // Backdrop 1.x.
   if (isset($template_export_langcode)) {
     $language = db_query("
     SELECT language, name, plurals, formula
-      FROM {languages} WHERE language = :langcode",
+      FROM {language} WHERE language = :langcode",
       array(':langcode' => $template_export_langcode))->fetchObject();
   }
 
-  $output  = '# $'.'Id'.'$'."\n";
-  $output .= "#\n";
+  $output = '';
   $output .= '# '. (isset($language) ? $language->name : 'LANGUAGE') .' translation of Backdrop ('. $file .")\n";
   $output .= "# Copyright YEAR NAME <EMAIL@ADDRESS>\n";
   $output .= "# --VERSIONS--\n";
@@ -527,15 +524,20 @@ function _potx_get_header($file, $template_export_langcode = NULL, $api_version 
  * @param $content_disposition
  *   See RFC2183. 'inline' or 'attachment', with a default of
  *   'inline'. Only used if $http_filename is set.
+ *
+ * @return array
+ *   An array of written or HTTP file names.
+ *
  * @todo
  *   Look into whether multiple files can be output via HTTP.
  */
 function _potx_write_files($http_filename = NULL, $content_disposition = 'inline') {
   global $_potx_store;
+  $file_names = array();
 
   // Generate file lists and output files.
   if (is_array($_potx_store)) {
-    foreach ($_potx_store as $file => $contents) {
+    foreach ($_potx_store as $file_path => $contents) {
       // Build replacement for file listing.
       if (count($contents['sources']) > 1) {
         $filelist = "Generated from files:\n#  " . join("\n#  ", $contents['sources']);
@@ -554,17 +556,21 @@ function _potx_write_files($http_filename = NULL, $content_disposition = 'inline
         header('Content-Transfer-Encoding: 8bit');
         header("Content-Disposition: $content_disposition; filename=$http_filename");
         print $output;
-        return;
+        $file_names[] = $http_filename;
+        return $file_names;
       }
       else {
         // Local file output, flatten directory structure.
-        $file = str_replace('.', '-', preg_replace('![/]?([a-zA-Z_0-9]*/)*!', '', $file)) .'.pot';
-        $fp = fopen($file, 'w');
+        $file_name = str_replace('.', '-', preg_replace('![/]?([a-zA-Z_0-9]*/)*!', '', $file_path)) .'.pot';
+        $fp = fopen($file_name, 'w');
         fwrite($fp, $output);
         fclose($fp);
+        $file_names[] = $file_name;
       }
     }
   }
+
+  return $file_names;
 }
 
 /**
@@ -648,6 +654,9 @@ function _potx_marker_error($file, $line, $marker, $ti, $error, $docs_url = NULL
  *   Excerpt of the code in question, if available.
  * @param $docs_url
  *   URL to the guidelines to follow to fix the problem.
+ *
+ * @return array
+ *   An array of warnings encountered during the operation.
  */
 function potx_status($op, $value = NULL, $file = NULL, $line = NULL, $excerpt = NULL, $docs_url = NULL) {
   static $mode = POTX_STATUS_CLI;
