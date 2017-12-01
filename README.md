@@ -42,7 +42,7 @@ basically two ways to use the contents of this project:
    extraction request, the memory limit for PHP on the server is probably
    too low, try to set that higher.
 
-The module also includes optional Coder (http://drupal.org/project/coder)
+The module also includes optional Coder Review (https://backdropcms.org/project/coder_review)
 integration, allowing you to spot translatability errors in modules while
 doing your regular code review.
 

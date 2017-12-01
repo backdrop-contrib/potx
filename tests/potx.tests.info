@@ -1,0 +1,5 @@
+[PotxTestCase]
+name = Translation template extractor
+description = Ensure that the translation template extractor functions properly.
+group = Translation template extractor
+file = potx.test
