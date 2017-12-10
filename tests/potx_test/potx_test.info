@@ -1,6 +1,6 @@
 name = Translation template extractor tester
 description = Provides example translation strings for testing potx.module
-package = Testing
+package = Test package
 type = module
 backdrop = 1.x
 hidden = TRUE

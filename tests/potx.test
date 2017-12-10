@@ -41,7 +41,7 @@ class PotxTestCase extends BackdropWebTestCase {
    */
   public function testBackdropModule() {
     // Parse and build the Backdrop module file.
-    $filename = __DIR__ . '/potx_test.module';
+    $filename = __DIR__ . '/potx_test/potx_test.module';
     $this->parseFile($filename, POTX_API_1);
 
     // Assert strings found in module source code.
@@ -101,12 +101,12 @@ class PotxTestCase extends BackdropWebTestCase {
    */
   public function testBackdropInfo() {
     // Parse and build the Backdrop module file.
-    $filename = __DIR__ . '/potx_test.info';
+    $filename = __DIR__ . '/potx_test/potx_test.info';
     $this->parseFile($filename, POTX_API_1);
 
     // Look for name, description and package name extracted.
     $this->assertMsgID('Translation template extractor tester');
-    $this->assertMsgID('Test description');
+    $this->assertMsgID('Provides example translation strings for testing potx.module');
     $this->assertMsgID('Test package');
   }
 
@@ -115,7 +115,7 @@ class PotxTestCase extends BackdropWebTestCase {
    */
   public function testBackdropJS() {
     // Parse and build the Backdrop JS file.
-    $filename = __DIR__ . '/potx_test.js';
+    $filename = __DIR__ . '/potx_test/potx_test.js';
     $this->parseFile($filename, POTX_API_1);
 
     // Assert strings found in JS source code.

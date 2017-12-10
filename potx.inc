@@ -138,7 +138,7 @@ define('POTX_JS_OBJECT_CONTEXT', '
  * Process a file and put extracted information to the given parameters.
  *
  * @param $file_path
- *   Comlete path to file to process.
+ *   Complete path to file to process.
  * @param $strip_prefix
  *   An integer denoting the number of chars to strip from filepath for output.
  * @param $save_callback
@@ -297,15 +297,15 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
 
   foreach ($strings as $string => $string_info) {
     foreach ($string_info as $context => $file_info) {
-      // Build a compact list of files this string occured in.
-      $occured = $file_list = array();
-      // Look for strings appearing in multiple directories (ie.
-      // different subprojects). So we can include them in general.pot.
+      // Build a compact list of files this string occurred in.
+      $occurred = $file_list = array();
+      // Look for strings appearing in multiple directories (i.e.
+      // different sub-projects). So we can include them in general.pot.
       $names = array_keys($file_info);
       $last_location = dirname(array_shift($names));
       $multiple_locations = FALSE;
       foreach ($file_info as $file => $lines) {
-        $occured[] = "$file:". join(';', $lines);
+        $occurred[] = "$file:". join(';', $lines);
         if (isset($versions[$file])) {
           $file_list[] = $versions[$file];
         }
@@ -316,7 +316,7 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
       }
 
       // Mark duplicate strings (both translated in the app and in the installer).
-      $comment = join(" ", $occured);
+      $comment = join(" ", $occurred);
       if (strpos($comment, '(dup)') !== FALSE) {
         $comment = '(duplicate) '. str_replace('(dup)', '', $comment);
       }
@@ -332,7 +332,7 @@ function _potx_build_files($string_mode = POTX_STRING_RUNTIME, $build_mode = POT
         $file_name = ($build_mode == POTX_BUILD_CORE ? 'general' : str_replace('.info', '.module', $file_name));
       }
       elseif ($multiple_locations) {
-        // Else if occured more than once, store in general.pot.
+        // Else if occurred more than once, store in general.pot.
         $file_name = 'general';
       }
       else {
@@ -1018,55 +1018,6 @@ function _potx_find_format_plural_calls($file, $save_callback, $function_name = 
           // $function_name() found, but the parameters are not correct.
           _potx_marker_error($file, $line, $function_name, $ti, t('In @function(), the singular and plural strings should be literal strings. There should be no variables, concatenation, constants or even a t() call there.', array('@function' => $function_name)), 'http://drupal.org/node/323072');
         }
-      }
-    }
-  }
-}
-
-/**
- * Detect permission names from the hook_perm() implementations.
- * Note that this will get confused with a similar pattern in a comment,
- * and with dynamic permissions, which need to be accounted for.
- *
- * @param $file
- *   Full path name of file parsed.
- * @param $filebase
- *   Filenaname of file parsed.
- * @param $save_callback
- *   Callback function used to save strings.
- */
-function _potx_find_perm_hook($file, $filebase, $save_callback) {
-  global $_potx_tokens, $_potx_lookup;
-
-  if (isset($_potx_lookup[$filebase .'_perm'])) {
-    // Special case for node module, because it uses dynamic permissions.
-    // Include the static permissions by hand. That's about all we can do here.
-    if ($filebase == 'node') {
-      $line = $_potx_tokens[$_potx_lookup['node_perm'][0]][2];
-      // List from node.module 1.763 (checked in on 2006/12/29 at 21:25:36 by drumm)
-      $nodeperms = array('administer content types', 'administer nodes', 'access content', 'view revisions', 'revert revisions');
-      foreach ($nodeperms as $item) {
-        // hook_perm() is only ever found on a Backdrop system which does not
-        // support context.
-        $save_callback($item, POTX_CONTEXT_NONE, $file, $line);
-      }
-    }
-    else {
-      $count = 0;
-      foreach ($_potx_lookup[$filebase .'_perm'] as $ti) {
-        $tn = $ti;
-        while (is_array($_potx_tokens[$tn]) || $_potx_tokens[$tn] != '}') {
-          if (is_array($_potx_tokens[$tn]) && $_potx_tokens[$tn][0] == T_CONSTANT_ENCAPSED_STRING) {
-            // hook_perm() is only ever found on a Backdrop system which does not
-            // support context.
-            $save_callback(_potx_format_quoted_string($_potx_tokens[$tn][1]), POTX_CONTEXT_NONE, $file, $_potx_tokens[$tn][2]);
-            $count++;
-          }
-          $tn++;
-        }
-      }
-      if (!$count) {
-        potx_status('error', t('%hook should have an array of literal string permission names.', array('%hook' => $filebase .'_perm()')), $file, NULL, NULL, 'http://drupal.org/node/323101');
       }
     }
   }
