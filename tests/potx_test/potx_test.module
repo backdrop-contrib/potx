@@ -58,7 +58,7 @@ function potx_test_page() {
     dt('This could have been in a drush file');
   }
 
-  t('Oh god why would @you omit a parenthesis?', array('@you' => 'fool'));
+  t('Oh god why would @you omit a parenthesis?', array('@you' => 'fool');
 
   t('PHP Syntax error gracefully handled');
 }

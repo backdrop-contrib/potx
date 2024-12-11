@@ -16,6 +16,11 @@ class PotxTestCase extends BackdropWebTestCase {
    */
   protected $potx_status;
 
+  /**
+   * @var string
+   */
+  protected $empty_error;
+
   public static function getInfo() {
     return array(
       'name' => t('Translation template extractor'),
